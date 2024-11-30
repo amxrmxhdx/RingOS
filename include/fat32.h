@@ -73,6 +73,8 @@ uint32_t fat32_get_next_cluster(uint32_t current_cluster);
 bool fat32_create_file(const char* name);
 bool fat32_delete_file(const char* name);
 bool fat32_list_directory(void (*callback)(const char* name, uint32_t size, uint8_t attr));
+bool fat32_create_directory(const char* name);
+bool fat32_init_directory_structure(void);
 
 // Add these helper macros
 #define FAT32_EOC 0x0FFFFFF8  // End of chain marker

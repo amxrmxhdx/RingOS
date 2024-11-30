@@ -90,6 +90,7 @@ static void cmd_help(void) {
     vga_writestr("\n  ls     - List files in directory");
     vga_writestr("\n  create - Create a new file");
     vga_writestr("\n  delete - Delete a file");
+    vga_writestr("\n  mkdir  - Create a new directory");
 }
 
 static void cmd_about(void) {
@@ -100,6 +101,20 @@ static void cmd_about(void) {
 static void cmd_clear(void) {
     vga_clear();
     print_prompt();
+}
+
+static void cmd_mkdir(const char* dirname) {
+    if (!dirname || strlen(dirname) == 0) {
+        vga_writestr("\nError: No directory name specified\n");
+        vga_writestr("Usage: mkdir <dirname>\n");
+        return;
+    }
+
+    if (fat32_create_directory(dirname)) {
+        vga_writestr("\nDirectory created successfully\n");
+    } else {
+        vga_writestr("\nError creating directory\n");
+    }
 }
 
 void shell_process_command(void) {
@@ -134,6 +149,9 @@ void shell_process_command(void) {
     }
     else if (strcmp(command, "delete") == 0) {
         cmd_delete(arg);
+    }
+    else if (strcmp(command, "mkdir") == 0) {
+        cmd_mkdir(arg);
     }
     else if (cmd_index > 0) {
         vga_writestr("\nUnknown command: ");

@@ -147,3 +147,62 @@ bool fat32_delete_file(const char* name) {
     }
     return false;
 }
+
+bool fat32_create_directory(const char* name) {
+    if (!is_initialized) return false;
+
+    uint32_t current_cluster = boot_sector.root_cluster;
+    uint8_t buffer[512];
+    fat32_dir_entry_t* entry;
+
+    while (current_cluster < 0x0FFFFFF8) {
+        uint32_t current_sector = cluster_to_lba(current_cluster);
+
+        for (uint32_t i = 0; i < sectors_per_cluster; i++) {
+            if (!ata_read_sectors(current_sector + i, 1, buffer)) {
+                return false;
+            }
+
+            entry = (fat32_dir_entry_t*)buffer;
+            for (uint32_t j = 0; j < 16; j++) {
+                if (entry[j].name[0] == 0x00 || entry[j].name[0] == 0xE5) {
+                    memset(&entry[j], 0, sizeof(fat32_dir_entry_t));
+                    memcpy(entry[j].name, name, 11);
+                    entry[j].attributes = ATTR_DIRECTORY;
+                    entry[j].file_size = 0;
+
+                    if (!ata_write_sectors(current_sector + i, 1, buffer)) {
+                        return false;
+                    }
+                    return true;
+                }
+            }
+        }
+        current_cluster = fat32_get_next_cluster(current_cluster);
+    }
+    return false;
+}
+
+bool fat32_init_directory_structure(void) {
+    // Create main directories
+    const char* directories[] = {
+        "USERLAND    ",  // 11 characters, space-padded
+        "DESKTOP     ",
+        "DOCUMENTS   ",
+        "BINARIES    "
+    };
+
+    // Create USERLAND first
+    if (!fat32_create_directory(directories[0])) {
+        return false;
+    }
+
+    // Create subdirectories
+    for (int i = 1; i < 4; i++) {
+        if (!fat32_create_directory(directories[i])) {
+            return false;
+        }
+    }
+
+    return true;
+}

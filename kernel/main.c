@@ -38,6 +38,11 @@ void kernel_main(void) {
         vga_writestr("WARNING: Filesystem commands will be unavailable.\n");
     } else {
         vga_writestr("OK\n");
+        if (fat32_init_directory_structure()) {
+            vga_writestr("Directory structure initialized.\n");
+        } else {
+            vga_writestr("Warning: Could not initialize directory structure.\n");
+        }
     }
     
     // Start shell
