@@ -63,6 +63,12 @@ typedef struct {
     uint32_t file_size;
 } __attribute__((packed)) fat32_dir_entry_t;
 
+typedef struct {
+    uint32_t cluster;
+    char name[12];
+    char path[256];
+} directory_entry_t;
+
 // Function prototypes
 bool fat32_init(void);
 bool fat32_read_boot_sector(fat32_boot_sector_t* boot_sector);
@@ -75,6 +81,14 @@ bool fat32_delete_file(const char* name);
 bool fat32_list_directory(void (*callback)(const char* name, uint32_t size, uint8_t attr));
 bool fat32_create_directory(const char* name);
 bool fat32_init_directory_structure(void);
+bool fat32_write_file(const char* name, const void* data, uint32_t size);
+bool fat32_read_file(const char* name, void* buffer, uint32_t* size);
+uint32_t fat32_allocate_cluster(void);
+bool fat32_write_fat_entry(uint32_t cluster, uint32_t value);
+bool fat32_change_directory(const char* dirname);
+uint32_t fat32_get_current_directory(void);
+const char* fat32_get_current_path(void);
+bool fat32_is_directory(const fat32_dir_entry_t* entry);
 
 // Add these helper macros
 #define FAT32_EOC 0x0FFFFFF8  // End of chain marker

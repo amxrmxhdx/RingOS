@@ -51,3 +51,12 @@ char* strcat(char* dest, const char* src) {
     while ((*d++ = *src++));
     return dest;
 }
+
+char* strncat(char* dest, const char* src, size_t n) {
+    char* d = dest + strlen(dest);
+    while (n-- && (*src)) {
+        *d++ = *src++;
+    }
+    *d = '\0';
+    return dest;
+}

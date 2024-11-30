@@ -14,7 +14,10 @@ static void cmd_about(void);
 static void cmd_clear(void);
 
 static void print_prompt(void) {
-    vga_writestr("\n@ ");
+    vga_writestr("\n@");
+    const char* path = fat32_get_current_path();
+    vga_writestr(path);
+    vga_writestr("> ");
 }
 
 static void ls_callback(const char* name, uint32_t size, uint8_t attr) {
@@ -82,6 +85,24 @@ static void cmd_delete(const char* filename) {
     print_prompt();
 }
 
+static void cmd_cd(const char* dirname) {
+    if (!dirname || strlen(dirname) == 0) {
+        // Just print current directory
+        vga_writestr("\nCurrent directory: ");
+        vga_writestr(fat32_get_current_path());
+        vga_writestr("\n");
+        return;
+    }
+
+    if (fat32_change_directory(dirname)) {
+        // Success - new prompt will show new directory
+    } else {
+        vga_writestr("\nError: Cannot change to directory '");
+        vga_writestr(dirname);
+        vga_writestr("'\n");
+    }
+}
+
 static void cmd_help(void) {
     vga_writestr("\nAvailable commands:");
     vga_writestr("\n  help   - Show this help message");
@@ -91,6 +112,9 @@ static void cmd_help(void) {
     vga_writestr("\n  create - Create a new file");
     vga_writestr("\n  delete - Delete a file");
     vga_writestr("\n  mkdir  - Create a new directory");
+    vga_writestr("\n  writeb - Write binary file (hex format)");
+    vga_writestr("\n  readb  - Read binary file (hex format)");
+    vga_writestr("\n  cd - Change directory");
 }
 
 static void cmd_about(void) {
@@ -114,6 +138,68 @@ static void cmd_mkdir(const char* dirname) {
         vga_writestr("\nDirectory created successfully\n");
     } else {
         vga_writestr("\nError creating directory\n");
+    }
+}
+
+static void cmd_write_binary(const char* args) {
+    // Example command: writeb filename 48656C6C6F
+    char filename[12] = {0};
+    char hexdata[256] = {0};
+    uint8_t binary[128] = {0};
+    uint32_t binary_size = 0;
+
+    // Parse arguments
+    int i = 0;
+    while (args[i] && args[i] != ' ') {
+        if (i < 11) filename[i] = args[i];
+        i++;
+    }
+
+    while (args[i] == ' ') i++;  // Skip spaces
+
+    // Convert hex string to binary
+    int j = 0;
+    while (args[i] && j < 255) {
+        hexdata[j++] = args[i++];
+    }
+    hexdata[j] = 0;
+
+    // Convert hex to binary
+    for (i = 0; i < strlen(hexdata); i += 2) {
+        uint8_t value = 0;
+        for (int k = 0; k < 2; k++) {
+            value <<= 4;
+            char c = hexdata[i + k];
+            if (c >= '0' && c <= '9') value |= c - '0';
+            else if (c >= 'A' && c <= 'F') value |= c - 'A' + 10;
+            else if (c >= 'a' && c <= 'f') value |= c - 'a' + 10;
+        }
+        binary[binary_size++] = value;
+    }
+
+    if (fat32_write_file(filename, binary, binary_size)) {
+        vga_writestr("\nBinary file written successfully\n");
+    } else {
+        vga_writestr("\nError writing binary file\n");
+    }
+}
+
+static void cmd_read_binary(const char* filename) {
+    uint8_t buffer[4096];
+    uint32_t size = sizeof(buffer);
+
+    if (fat32_read_file(filename, buffer, &size)) {
+        vga_writestr("\nContent (hex): ");
+        for (uint32_t i = 0; i < size; i++) {
+            char hex[3];
+            hex[0] = "0123456789ABCDEF"[buffer[i] >> 4];
+            hex[1] = "0123456789ABCDEF"[buffer[i] & 0xF];
+            hex[2] = 0;
+            vga_writestr(hex);
+        }
+        vga_writestr("\n");
+    } else {
+        vga_writestr("\nError reading binary file\n");
     }
 }
 
@@ -152,6 +238,15 @@ void shell_process_command(void) {
     }
     else if (strcmp(command, "mkdir") == 0) {
         cmd_mkdir(arg);
+    }
+    else if (strcmp(command, "writeb") == 0 && arg) {
+        cmd_write_binary(arg);
+    }
+    else if (strcmp(command, "readb") == 0 && arg) {
+        cmd_read_binary(arg);
+    }
+    else if (strcmp(command, "cd") == 0) {
+        cmd_cd(arg);
     }
     else if (cmd_index > 0) {
         vga_writestr("\nUnknown command: ");

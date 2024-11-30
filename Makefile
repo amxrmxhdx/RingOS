@@ -19,6 +19,7 @@ HEADERS = $(wildcard $(INCLUDE_DIR)/*.h)
 OBJ = ${C_SOURCES:.c=.o} ${ASM_SOURCES:.asm=.o}
 
 # Disk image settings
+FILESYSTEM_DIR = filesystem
 DISK_IMAGE = disk.img
 DISK_SIZE_MB = 128
 
@@ -37,10 +38,14 @@ all: os.bin $(DISK_IMAGE)
 os.bin: ${OBJ}
 	ld ${LDFLAGS} -o $@ $^
 
-# Create disk image
-$(DISK_IMAGE):
-	dd if=/dev/zero of=$(DISK_IMAGE) bs=1M count=$(DISK_SIZE_MB)
-	mkfs.fat -F 32 $(DISK_IMAGE)
+# Build filesystem tool
+tools/mkfs: tools/mkfs.c
+	$(CC) -o $@ $<
+
+# Create filesystem image
+$(DISK_IMAGE): tools/mkfs
+	dd if=/dev/zero of=$(DISK_IMAGE) bs=1M count=32
+	./tools/mkfs $(FILESYSTEM_DIR) $(DISK_IMAGE)
 
 # Clean build files
 clean:
