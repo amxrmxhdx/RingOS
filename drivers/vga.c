@@ -2,6 +2,10 @@
 #include "../include/io.h"
 #include "../include/string.h"
 
+#define VGA_BLACK 0x0
+#define VGA_WHITE 0xF
+#define VGA_COLOR(fg, bg) ((fg) | (bg << 4))
+
 static uint16_t* const vga_buffer = (uint16_t*)VGA_MEMORY;
 static uint8_t vga_color;
 static uint16_t cursor_pos;
@@ -14,7 +18,7 @@ static uint16_t vga_entry(char c, uint8_t color) {
 
 void vga_init(void) {
     // Force black background (0), white foreground (15)
-    vga_color = 0x0F;  // 00001111 in binary
+    vga_color = VGA_COLOR(VGA_WHITE, VGA_BLACK);  // 00001111 in binary
     cursor_pos = 0;
     
     // Fill entire screen with spaces using our color

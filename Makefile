@@ -20,7 +20,7 @@ OBJ = ${C_SOURCES:.c=.o} ${ASM_SOURCES:.asm=.o}
 
 # Disk image settings
 DISK_IMAGE = disk.img
-DISK_SIZE_MB = 32
+DISK_SIZE_MB = 128
 
 # Main target
 all: os.bin $(DISK_IMAGE)
@@ -48,4 +48,4 @@ clean:
 
 # Run in QEMU
 run: os.bin $(DISK_IMAGE)
-	qemu-system-i386 -kernel os.bin -drive file=$(DISK_IMAGE),format=raw,if=ide
+	qemu-system-i386 -kernel os.bin -drive file=$(DISK_IMAGE),format=raw,if=ide -vga vmware
