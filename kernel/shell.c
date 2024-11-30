@@ -14,7 +14,7 @@ static void cmd_about(void);
 static void cmd_clear(void);
 
 static void print_prompt(void) {
-    vga_writestr("\nRingOS> ");
+    vga_writestr("\n@ ");
 }
 
 static void ls_callback(const char* name, uint32_t size, uint8_t attr) {
