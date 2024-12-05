@@ -13,21 +13,105 @@ static directory_entry_t current_directory;
 static directory_entry_t parent_directories[16];
 static int directory_depth = 0;
 
+static void uint32_to_str(uint32_t num, char* str) {
+    char rev[11];
+    int i = 0;
+    
+    // Handle 0 case
+    if (num == 0) {
+        str[0] = '0';
+        str[1] = '\0';
+        return;
+    }
+    
+    // Convert to string in reverse
+    while (num != 0) {
+        rev[i++] = '0' + (num % 10);
+        num = num / 10;
+    }
+    
+    // Reverse the string
+    int j;
+    for (j = 0; j < i; j++) {
+        str[j] = rev[i - 1 - j];
+    }
+    str[j] = '\0';
+}
+
+static bool compare_filename(const char* fat_name, const char* entry_name) {
+    // Compare names case-insensitively
+    for (int i = 0; i < 11; i++) {
+        char c1 = fat_name[i];
+        char c2 = entry_name[i];
+        
+        // Convert both to uppercase for comparison
+        if (c1 >= 'a' && c1 <= 'z') c1 = c1 - 'a' + 'A';
+        if (c2 >= 'a' && c2 <= 'z') c2 = c2 - 'a' + 'A';
+        
+        if (c1 != c2) return false;
+    }
+    return true;
+}
+
+static bool compare_names(const char* fat_name, const char* dir_name) {
+    // Compare up to the first space or 11 characters
+    int i;
+    for (i = 0; i < 11; i++) {
+        // If we hit a space in the directory entry, ignore remaining spaces in fat_name
+        if (dir_name[i] == ' ') {
+            while (i < 11 && fat_name[i] == ' ') i++;
+            return (i == 11);
+        }
+        
+        // If characters don't match (ignoring case), names don't match
+        char c1 = fat_name[i];
+        char c2 = dir_name[i];
+        if (c1 >= 'a' && c1 <= 'z') c1 = c1 - 'a' + 'A';
+        if (c2 >= 'a' && c2 <= 'z') c2 = c2 - 'a' + 'A';
+        
+        if (c1 != c2) return false;
+    }
+    return true;
+}
+
 static void update_path(void) {
+    // Start with root
     current_directory.path[0] = '/';
     current_directory.path[1] = '\0';
 
+    // Build path from parent directories
     for (int i = 0; i < directory_depth; i++) {
+        // Don't add another slash if we're already at root
         if (strcmp(current_directory.path, "/") != 0) {
             strcat(current_directory.path, "/");
         }
-        strncat(current_directory.path, parent_directories[i].name, 11);
+        
+        // Add current directory name, trimming any spaces
+        char trimmed_name[12];
+        int j;
+        for (j = 0; j < 11 && parent_directories[i].name[j] != ' '; j++) {
+            trimmed_name[j] = parent_directories[i].name[j];
+        }
+        trimmed_name[j] = '\0';
+        strcat(current_directory.path, trimmed_name);
     }
 
-    if (directory_depth > 0 && strcmp(current_directory.path, "/") != 0) {
-        strcat(current_directory.path, "/");
+    // Add current directory to path (if not root)
+    if (strcmp(current_directory.name, "/") != 0) {
+        // Don't add another slash if we're already at root
+        if (strcmp(current_directory.path, "/") != 0) {
+            strcat(current_directory.path, "/");
+        }
+        
+        // Add current directory name, trimming any spaces
+        char trimmed_name[12];
+        int j;
+        for (j = 0; j < 11 && current_directory.name[j] != ' '; j++) {
+            trimmed_name[j] = current_directory.name[j];
+        }
+        trimmed_name[j] = '\0';
+        strcat(current_directory.path, trimmed_name);
     }
-    strncat(current_directory.path, current_directory.name, 11);
 }
 
 bool fat32_init(void) {
@@ -94,14 +178,9 @@ bool fat32_change_directory(const char* dirname) {
     // Handle going up one directory
     if (strcmp(dirname, "..") == 0) {
         if (directory_depth > 0) {
-            // Pop the last directory from the stack
             directory_depth--;
             current_directory = parent_directories[directory_depth];
             update_path();
-            return true;
-        }
-        // If we're already at root, just stay there
-        if (current_directory.cluster == boot_sector.root_cluster) {
             return true;
         }
         return false;
@@ -112,6 +191,34 @@ bool fat32_change_directory(const char* dirname) {
         return true;
     }
 
+    // Convert input name to FAT32 8.3 format for comparison
+    char fat_name[11];
+    memset(fat_name, ' ', 11);
+    
+    // Find dot in name (if any)
+    const char* dot = dirname;
+    size_t name_len = 0;
+    while (*dot && *dot != '.' && name_len < 8) {
+        // Convert to uppercase while copying
+        fat_name[name_len] = (*dot >= 'a' && *dot <= 'z') ? 
+                            (*dot - 'a' + 'A') : *dot;
+        dot++;
+        name_len++;
+    }
+
+    // If we found a dot and there's an extension
+    if (*dot == '.' && dot[1]) {
+        dot++; // Skip the dot
+        size_t ext_pos = 8;
+        while (*dot && ext_pos < 11) {
+            // Convert extension to uppercase
+            fat_name[ext_pos] = (*dot >= 'a' && *dot <= 'z') ? 
+                               (*dot - 'a' + 'A') : *dot;
+            dot++;
+            ext_pos++;
+        }
+    }
+
     // Search for directory in current directory
     uint32_t current_cluster = current_directory.cluster;
     uint8_t buffer[512];
@@ -119,19 +226,31 @@ bool fat32_change_directory(const char* dirname) {
 
     while (current_cluster < 0x0FFFFFF8) {
         uint32_t current_sector = cluster_to_lba(current_cluster);
-
+        
         for (uint32_t i = 0; i < sectors_per_cluster; i++) {
             if (!ata_read_sectors(current_sector + i, 1, buffer)) {
                 return false;
             }
 
             entry = (fat32_dir_entry_t*)buffer;
-            for (uint32_t j = 0; j < 16; j++) {
-                if (entry[j].name[0] == 0x00) break;
-                if (entry[j].name[0] == 0xE5) continue;
+            for (uint32_t j = 0; j < (SECTOR_SIZE / sizeof(fat32_dir_entry_t)); j++) {
+                // Check for end of directory
+                if (entry[j].name[0] == 0x00) {
+                    return false;
+                }
 
-                if (memcmp(entry[j].name, dirname, 11) == 0 &&
-                    (entry[j].attributes & ATTR_DIRECTORY)) {
+                // Skip deleted entries and volume labels
+                if (entry[j].name[0] == 0xE5 || entry[j].attributes == 0x08) {
+                    continue;
+                }
+
+                // Skip non-directory entries
+                if (!(entry[j].attributes & 0x10)) {
+                    continue;
+                }
+
+                // Compare names
+                if (compare_names(fat_name, entry[j].name)) {
                     // Found the directory - push current directory to stack
                     if (directory_depth < 16) {
                         parent_directories[directory_depth++] = current_directory;
@@ -151,11 +270,13 @@ bool fat32_change_directory(const char* dirname) {
             }
         }
         current_cluster = fat32_get_next_cluster(current_cluster);
+        if (current_cluster == 0) {
+            return false;
+        }
     }
 
     return false;
 }
-
 
 bool fat32_list_directory(void (*callback)(const char* name, uint32_t size, uint8_t attr)) {
     if (!is_initialized) return false;
@@ -166,27 +287,34 @@ bool fat32_list_directory(void (*callback)(const char* name, uint32_t size, uint
 
     while (current_cluster < 0x0FFFFFF8) {
         uint32_t current_sector = cluster_to_lba(current_cluster);
-
+        
         for (uint32_t i = 0; i < sectors_per_cluster; i++) {
             if (!ata_read_sectors(current_sector + i, 1, buffer)) {
                 return false;
             }
 
             entry = (fat32_dir_entry_t*)buffer;
-            for (uint32_t j = 0; j < 16; j++) {
+            for (uint32_t j = 0; j < (SECTOR_SIZE / sizeof(fat32_dir_entry_t)); j++) {
+                // Check for end of directory
                 if (entry[j].name[0] == 0x00) {
                     return true;
                 }
-                if (entry[j].name[0] == 0xE5) {
+
+                // Skip deleted entries, volume labels, and special entries (. and ..)
+                if (entry[j].name[0] == 0xE5 || 
+                    entry[j].attributes == 0x08 ||
+                    entry[j].name[0] == '.') {
                     continue;
                 }
-                if ((entry[j].attributes & 0x0F) == 0) {
-                    callback((char*)entry[j].name, entry[j].file_size, entry[j].attributes);
-                }
+
+                callback((char*)entry[j].name, entry[j].file_size, entry[j].attributes);
             }
         }
 
         current_cluster = fat32_get_next_cluster(current_cluster);
+        if (current_cluster == 0) {
+            return false;
+        }
     }
 
     return true;
@@ -455,11 +583,13 @@ bool fat32_read_file(const char* name, void* buffer, uint32_t* size) {
 
             entry = (fat32_dir_entry_t*)dir_buffer;
             for (uint32_t j = 0; j < 16; j++) {
-                if (entry[j].name[0] != 0x00 && entry[j].name[0] != 0xE5 &&
-                    memcmp(entry[j].name, name, 11) == 0) {
-                    entry = &entry[j];
-                    found = true;
-                    break;
+                if (entry[j].name[0] != 0x00 && entry[j].name[0] != 0xE5) {
+                    // Use case-insensitive comparison
+                    if (compare_filename(name, entry[j].name)) {
+                        entry = &entry[j];
+                        found = true;
+                        break;
+                    }
                 }
             }
         }

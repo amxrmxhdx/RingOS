@@ -2,6 +2,7 @@
 #include <vga.h>
 #include <keyboard.h>
 #include <fat32.h>
+#include <loader.h>
 
 #define MAX_CMD_LENGTH 256
 
@@ -103,6 +104,121 @@ static void cmd_cd(const char* dirname) {
     }
 }
 
+void cmd_cat(const char* filename) {
+    if (!filename || !*filename) {
+        vga_writestr("Usage: cat <filename>\n");
+        return;
+    }
+
+    // Create a FAT formatted name
+    char fat_name[11];
+    memset(fat_name, ' ', 11);
+    
+    // Copy name part (up to 8 chars)
+    const char* dot = filename;
+    size_t name_len = 0;
+    while (*dot && *dot != '.' && name_len < 8) {
+        fat_name[name_len] = (*dot >= 'a' && *dot <= 'z') ? 
+                            (*dot - 'a' + 'A') : *dot;
+        dot++;
+        name_len++;
+    }
+
+    // Copy extension if exists
+    if (*dot == '.' && dot[1]) {
+        dot++; // Skip the dot
+        size_t ext_pos = 8;
+        while (*dot && ext_pos < 11) {
+            fat_name[ext_pos] = (*dot >= 'a' && *dot <= 'z') ? 
+                               (*dot - 'a' + 'A') : *dot;
+            dot++;
+            ext_pos++;
+        }
+    }
+
+    vga_writestr("Looking for file: '");
+    for (int i = 0; i < 11; i++) {
+        char c[2] = {fat_name[i], '\0'};
+        vga_writestr(c);
+    }
+    vga_writestr("'\n");
+
+    // Static buffer for file content
+    static char buffer[4096];  // 4KB buffer
+    uint32_t size = sizeof(buffer) - 1;  // Leave room for null terminator
+
+    // Read file
+    if (!fat32_read_file(fat_name, buffer, &size)) {
+        vga_writestr("Error: File not found or error reading file (size=");
+        
+        // Convert size to string for debug output
+        char size_str[16];
+        int idx = 0;
+        uint32_t temp = size;
+        do {
+            size_str[idx++] = '0' + (temp % 10);
+            temp /= 10;
+        } while (temp > 0);
+        size_str[idx] = '\0';
+        
+        // Print digits in reverse order
+        while (idx > 0) {
+            char c[2] = {size_str[--idx], '\0'};
+            vga_writestr(c);
+        }
+        
+        vga_writestr(")\n");
+        return;
+    }
+
+    // Null terminate and print
+    buffer[size] = '\0';
+    vga_writestr(buffer);
+    vga_writestr("\n");
+}
+
+void cmd_exec(const char* filename) {
+    if (!filename || !*filename) {
+        vga_writestr("Usage: exec <filename>\n");
+        return;
+    }
+
+    // Format filename for FAT32
+    char fat_name[11];
+    memset(fat_name, ' ', 11);
+    
+    const char* dot = filename;
+    size_t name_len = 0;
+    while (*dot && *dot != '.' && name_len < 8) {
+        fat_name[name_len] = (*dot >= 'a' && *dot <= 'z') ? 
+                            (*dot - 'a' + 'A') : *dot;
+        dot++;
+        name_len++;
+    }
+
+    if (*dot == '.' && dot[1]) {
+        dot++;
+        size_t ext_pos = 8;
+        while (*dot && ext_pos < 11) {
+            fat_name[ext_pos] = (*dot >= 'a' && *dot <= 'z') ? 
+                               (*dot - 'a' + 'A') : *dot;
+            dot++;
+            ext_pos++;
+        }
+    }
+
+    program_info_t prog_info;
+    if (!load_program(fat_name, &prog_info)) {
+        vga_writestr("Error: Could not load program\n");
+        return;
+    }
+
+    vga_writestr("Program loaded successfully. Executing...\n");
+    jump_to_program(prog_info.entry_point, prog_info.stack_pointer);
+    vga_writestr("Program execution completed\n");
+}
+
+
 static void cmd_help(void) {
     vga_writestr("\nAvailable commands:");
     vga_writestr("\n  help   - Show this help message");
@@ -115,6 +231,8 @@ static void cmd_help(void) {
     vga_writestr("\n  writeb - Write binary file (hex format)");
     vga_writestr("\n  readb  - Read binary file (hex format)");
     vga_writestr("\n  cd - Change directory");
+    vga_writestr("\n  cat - Read file content");
+    vga_writestr("\n  exec - Execute a binary");
 }
 
 static void cmd_about(void) {
@@ -165,11 +283,12 @@ static void cmd_write_binary(const char* args) {
     hexdata[j] = 0;
 
     // Convert hex to binary
-    for (i = 0; i < strlen(hexdata); i += 2) {
+    size_t hex_len = strlen(hexdata);
+    for (size_t idx = 0; idx < hex_len; idx += 2) {
         uint8_t value = 0;
         for (int k = 0; k < 2; k++) {
             value <<= 4;
-            char c = hexdata[i + k];
+            char c = hexdata[idx + k];
             if (c >= '0' && c <= '9') value |= c - '0';
             else if (c >= 'A' && c <= 'F') value |= c - 'A' + 10;
             else if (c >= 'a' && c <= 'f') value |= c - 'a' + 10;
@@ -247,6 +366,12 @@ void shell_process_command(void) {
     }
     else if (strcmp(command, "cd") == 0) {
         cmd_cd(arg);
+    }
+    else if (strcmp(command, "cat") == 0) {
+        cmd_cat(arg);
+    }
+    else if (strcmp(command, "exec") == 0) {
+        cmd_exec(arg);
     }
     else if (cmd_index > 0) {
         vga_writestr("\nUnknown command: ");

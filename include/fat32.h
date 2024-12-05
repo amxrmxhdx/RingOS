@@ -74,7 +74,6 @@ bool fat32_init(void);
 bool fat32_read_boot_sector(fat32_boot_sector_t* boot_sector);
 bool fat32_read_root_directory(void);
 bool fat32_find_file(const char* name, fat32_dir_entry_t* entry);
-bool fat32_read_file(const fat32_dir_entry_t* entry, void* buffer);
 uint32_t fat32_get_next_cluster(uint32_t current_cluster);
 bool fat32_create_file(const char* name);
 bool fat32_delete_file(const char* name);

@@ -1,5 +1,14 @@
 {
     "files.associations": {
-        "keyboard.h": "c"
+        "keyboard.h": "c",
+        "array": "c",
+        "string": "c",
+        "string_view": "c",
+        "span": "c",
+        "loader.h": "c",
+        "memory.h": "c",
+        "fat32.h": "c",
+        "vga.h": "c",
+        "types.h": "c"
     }
 }
