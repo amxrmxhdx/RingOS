@@ -15,9 +15,14 @@ static void cmd_about(void);
 static void cmd_clear(void);
 
 static void print_prompt(void) {
-    vga_writestr("\n@");
+    vga_set_color(VGA_CYAN, VGA_BLACK);
+    vga_writestr("\nuser");
+    vga_set_color(VGA_MAGENTA, VGA_BLACK);
+    vga_writestr("@");
     const char* path = fat32_get_current_path();
+    vga_set_color(VGA_CYAN, VGA_BLACK);
     vga_writestr(path);
+    vga_set_color(VGA_WHITE, VGA_BLACK);
     vga_writestr("> ");
 }
 
@@ -184,28 +189,53 @@ void cmd_exec(const char* filename) {
     }
 
     // Format filename for FAT32
-    char fat_name[11];
-    memset(fat_name, ' ', 11);
+    char fat_name[12];
+    memset(fat_name, ' ', 11);  // Fill with spaces
+    fat_name[11] = '\0';
     
+    // First, find the dot
     const char* dot = filename;
     size_t name_len = 0;
-    while (*dot && *dot != '.' && name_len < 8) {
-        fat_name[name_len] = (*dot >= 'a' && *dot <= 'z') ? 
-                            (*dot - 'a' + 'A') : *dot;
-        dot++;
+    while (dot[name_len] && dot[name_len] != '.') {
         name_len++;
     }
 
-    if (*dot == '.' && dot[1]) {
-        dot++;
-        size_t ext_pos = 8;
-        while (*dot && ext_pos < 11) {
-            fat_name[ext_pos] = (*dot >= 'a' && *dot <= 'z') ? 
-                               (*dot - 'a' + 'A') : *dot;
-            dot++;
-            ext_pos++;
+    // Copy base name (up to 8 chars)
+    size_t copy_len = name_len > 8 ? 8 : name_len;
+    for (size_t i = 0; i < copy_len; i++) {
+        // Convert to uppercase
+        char c = filename[i];
+        if (c >= 'a' && c <= 'z') {
+            c = c - 'a' + 'A';
+        }
+        fat_name[i] = c;
+    }
+
+    // If we found a dot and there's an extension
+    if (dot[name_len] == '.' && dot[name_len + 1]) {
+        // Copy extension (up to 3 chars)
+        const char* ext = &dot[name_len + 1];
+        for (size_t i = 0; i < 3 && ext[i]; i++) {
+            // Convert to uppercase
+            char c = ext[i];
+            if (c >= 'a' && c <= 'z') {
+                c = c - 'a' + 'A';
+            }
+            fat_name[8 + i] = c;
         }
     }
+
+    // Debug output
+    vga_writestr("FAT name: [");
+    for(int i = 0; i < 11; i++) {
+        if(fat_name[i] == ' ') {
+            vga_writestr("_");  // Show spaces clearly
+        } else {
+            char c[2] = {fat_name[i], '\0'};
+            vga_writestr(c);
+        }
+    }
+    vga_writestr("]\n");
 
     program_info_t prog_info;
     if (!load_program(fat_name, &prog_info)) {
@@ -217,7 +247,6 @@ void cmd_exec(const char* filename) {
     jump_to_program(prog_info.entry_point, prog_info.stack_pointer);
     vga_writestr("Program execution completed\n");
 }
-
 
 static void cmd_help(void) {
     vga_writestr("\nAvailable commands:");
@@ -404,7 +433,9 @@ void shell_handle_keypress(char c) {
 void shell_init(void) {
     cmd_index = 0;
     vga_clear();
+    vga_set_color(VGA_BLUE, VGA_WHITE);
     vga_writestr("Welcome to RingOS!\n");
+    vga_set_color(VGA_WHITE, VGA_BLACK);
     vga_writestr("Type 'help' for available commands.\n");
     print_prompt();
 }

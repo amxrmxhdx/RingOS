@@ -3,72 +3,56 @@
 #include "../include/memory.h"
 #include "../include/string.h"
 #include "../include/vga.h"
+#include "../include/stdint.h"
 
 bool load_program(const char* filename, program_info_t* info) {
     if (!info) return false;
     
-    // Initialize program info
+    // Initialize program info - keep program and stack well separated
     info->loaded = false;
-    info->entry_point = PROGRAM_LOAD_ADDR;
-    info->stack_pointer = PROGRAM_LOAD_ADDR + STACK_SIZE;
+    info->entry_point = PROGRAM_LOAD_ADDR + 0x1000;  // Add 4KB offset for safety
+    info->stack_pointer = PROGRAM_LOAD_ADDR + STACK_SIZE - 0x1000;  // Leave 4KB safety margin
 
-    // Clear program memory
-    memset((void*)PROGRAM_LOAD_ADDR, 0, STACK_SIZE);
+    vga_writestr("Loading program...\n");
 
-    // Debug: Print file details
-    vga_writestr("Loading program at: 0x");
-    // Print address in hex
-    for (int i = 7; i >= 0; i--) {
-        char hex = "0123456789ABCDEF"[(PROGRAM_LOAD_ADDR >> (i * 4)) & 0xF];
-        char str[2] = {hex, 0};
-        vga_writestr(str);
-    }
-    vga_writestr("\n");
+    // Use a much smaller buffer initially for testing
+    uint32_t buffer_size = 4096;  // Start with just 4KB
+    
+    // Clear only the program area
+    memset((void*)info->entry_point, 0, buffer_size);
 
-    // Read the program file
-    uint32_t size = 0;
-    if (!fat32_read_file(filename, (void*)PROGRAM_LOAD_ADDR, &size)) {
+    // Read file with limited size
+    uint32_t size = buffer_size;
+    if (!fat32_read_file(filename, (void*)info->entry_point, &size)) {
         vga_writestr("Error: Could not read program file\n");
         return false;
     }
-
-    // Debug: Print program size
-    vga_writestr("Program size: ");
-    char size_str[32];
-    int idx = 0;
-    uint32_t temp = size;
-    do {
-        size_str[idx++] = '0' + (temp % 10);
-        temp /= 10;
-    } while (temp > 0);
-    while (idx > 0) {
-        char c[2] = {size_str[--idx], 0};
-        vga_writestr(c);
-    }
-    vga_writestr(" bytes\n");
 
     info->loaded = true;
     return true;
 }
 
-__attribute__((naked)) void jump_to_program(uint32_t entry_point, uint32_t stack_pointer) {
-    // Save the current GDT and IDT limits
+void jump_to_program(uint32_t entry_point, uint32_t stack_pointer) {
+    typedef void (*program_entry)(void);
+    program_entry program = (program_entry)entry_point;
+
+    vga_writestr("Jumping to program at 0x");
+    for (int i = 7; i >= 0; i--) {
+        char hex = "0123456789ABCDEF"[(entry_point >> (i * 4)) & 0xF];
+        char str[2] = {hex, 0};
+        vga_writestr(str);
+    }
+    vga_writestr("\n");
+
+    // Just switch stack and jump
     asm volatile(
-        // Set up new stack
-        "mov %1, %%esp\n"
-        // Save old stack
-        "push %%ebp\n"
-        // Push return address
-        "push $1f\n"
-        // Jump to program
-        "jmp *%0\n"
-        // Return point
-        "1:\n"
-        // Restore old stack
-        "pop %%ebp\n"
-        "mov %%ebp, %%esp\n"
-        "ret\n"
+        "mov %0, %%esp\n"
+        "call *%1\n"
         :
-        : "r"(entry_point), "r"(stack_pointer)
+        : "r"(stack_pointer), "r"(entry_point)
+        : "memory"
     );
+
+    // We shouldn't get here normally - program should exit via interrupt
+    vga_writestr("Program returned via interrupt\n");
 }

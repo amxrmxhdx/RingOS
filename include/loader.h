@@ -3,8 +3,8 @@
 
 #include "../include/types.h"
 
-#define PROGRAM_LOAD_ADDR 0x100000  // 1MB mark
-#define STACK_SIZE 0x4000           // 16KB stack
+#define PROGRAM_LOAD_ADDR 0x100000  // Keep at 1MB mark
+#define STACK_SIZE 0x8000           // Reduce to 32KB to prevent memory conflicts
 
 typedef struct {
     uint32_t entry_point;

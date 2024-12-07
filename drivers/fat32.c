@@ -3,7 +3,9 @@
 #include "../include/string.h"
 #include "../include/vga.h"
 #include "../include/ata.h"
+#include "../include/stdint.h"
 
+static bool debug = false;
 static bool is_initialized = false;
 static fat32_boot_sector_t boot_sector;
 static uint32_t fat_begin_lba;
@@ -39,17 +41,93 @@ static void uint32_to_str(uint32_t num, char* str) {
 }
 
 static bool compare_filename(const char* fat_name, const char* entry_name) {
-    // Compare names case-insensitively
-    for (int i = 0; i < 11; i++) {
-        char c1 = fat_name[i];
-        char c2 = entry_name[i];
+    if (debug) {
+        vga_writestr("Comparing names:\n");
+        vga_writestr("FAT:    [");
+        for(int i = 0; i < 11; i++) {
+            if(fat_name[i] == ' ') vga_writestr("_");
+            else {
+                char c[2] = {fat_name[i], '\0'};
+                vga_writestr(c);
+            }
+        }
+        vga_writestr("]\n");
         
-        // Convert both to uppercase for comparison
-        if (c1 >= 'a' && c1 <= 'z') c1 = c1 - 'a' + 'A';
-        if (c2 >= 'a' && c2 <= 'z') c2 = c2 - 'a' + 'A';
-        
-        if (c1 != c2) return false;
+        vga_writestr("ENTRY:  [");
+        for(int i = 0; i < 11; i++) {
+            if(entry_name[i] == ' ') vga_writestr("_");
+            else {
+                char c[2] = {entry_name[i], '\0'};
+                vga_writestr(c);
+            }
+        }
+        vga_writestr("]\n");
     }
+
+    // Convert test.bin to TEST    BIN format for comparison
+    char normalized[11];
+    int src = 0, dst = 0;
+    
+    // Copy name part (up to dot or 8 chars)
+    while (dst < 8 && entry_name[src] && entry_name[src] != '.') {
+        char c = entry_name[src++];
+        if (c >= 'a' && c <= 'z') {
+            c = c - 'a' + 'A';
+        }
+        normalized[dst++] = c;
+    }
+    
+    // Pad name with spaces
+    while (dst < 8) {
+        normalized[dst++] = ' ';
+    }
+    
+    // Skip dot if present
+    if (entry_name[src] == '.') {
+        src++;
+    }
+    
+    // Copy extension
+    while (dst < 11 && entry_name[src]) {
+        char c = entry_name[src++];
+        if (c >= 'a' && c <= 'z') {
+            c = c - 'a' + 'A';
+        }
+        normalized[dst++] = c;
+    }
+    
+    // Pad extension with spaces
+    while (dst < 11) {
+        normalized[dst++] = ' ';
+    }
+
+    if (debug) {
+        // Debug - show normalized name
+        vga_writestr("NORM:   [");
+        for(int i = 0; i < 11; i++) {
+            if(normalized[i] == ' ') vga_writestr("_");
+            else {
+                char c[2] = {normalized[i], '\0'};
+                vga_writestr(c);
+            }
+        }
+        vga_writestr("]\n");
+    }
+
+    // Compare normalized name with FAT name
+    for (int i = 0; i < 11; i++) {
+        if (normalized[i] != fat_name[i]) {
+            if (debug) {
+                vga_writestr("Mismatch at position ");
+                char pos[2] = {'0' + i, '\0'};
+                vga_writestr(pos);
+                vga_writestr("\n");
+            }
+            return false;
+        }
+    }
+
+    if (debug) vga_writestr("Names match!\n");
     return true;
 }
 
@@ -565,7 +643,10 @@ bool fat32_write_file(const char* name, const void* data, uint32_t size) {
 }
 
 bool fat32_read_file(const char* name, void* buffer, uint32_t* size) {
-    if (!is_initialized || !buffer || !size) return false;
+    if (!is_initialized || !buffer || !size) {
+        if (debug) vga_writestr("[FAT32] Invalid parameters\n");
+        return false;
+    }
 
     uint32_t current_cluster = current_directory.cluster;
     uint8_t dir_buffer[512];
@@ -575,16 +656,16 @@ bool fat32_read_file(const char* name, void* buffer, uint32_t* size) {
     // Find the file entry
     while (current_cluster < 0x0FFFFFF8 && !found) {
         uint32_t current_sector = cluster_to_lba(current_cluster);
-
+        
         for (uint32_t i = 0; i < sectors_per_cluster && !found; i++) {
             if (!ata_read_sectors(current_sector + i, 1, dir_buffer)) {
+                if (debug) vga_writestr("[FAT32] Failed to read directory sector\n");
                 return false;
             }
 
             entry = (fat32_dir_entry_t*)dir_buffer;
             for (uint32_t j = 0; j < 16; j++) {
                 if (entry[j].name[0] != 0x00 && entry[j].name[0] != 0xE5) {
-                    // Use case-insensitive comparison
                     if (compare_filename(name, entry[j].name)) {
                         entry = &entry[j];
                         found = true;
@@ -598,10 +679,30 @@ bool fat32_read_file(const char* name, void* buffer, uint32_t* size) {
         }
     }
 
-    if (!found) return false;
+    if (!found) {
+        if (debug) vga_writestr("[FAT32] File not found\n");
+        return false;
+    }
+
+    // Display file information
+    vga_writestr("[FAT32] File found! Size: ");
+    char size_str[32];
+    uint32_t_to_str(entry->file_size, size_str);
+    vga_writestr(size_str);
+    vga_writestr(" bytes\n");
+
+    vga_writestr("[FAT32] First cluster: 0x");
+    uint32_t first_cluster = ((uint32_t)entry->first_cluster_high << 16) | entry->first_cluster_low;
+    for (int i = 7; i >= 0; i--) {
+        char hex = "0123456789ABCDEF"[(first_cluster >> (i * 4)) & 0xF];
+        char str[2] = {hex, 0};
+        vga_writestr(str);
+    }
+    vga_writestr("\n");
 
     // Check buffer size
     if (*size < entry->file_size) {
+        vga_writestr("[FAT32] Buffer too small\n");
         *size = entry->file_size;
         return false;
     }
@@ -609,25 +710,44 @@ bool fat32_read_file(const char* name, void* buffer, uint32_t* size) {
     // Read file data
     *size = entry->file_size;
     uint32_t bytes_read = 0;
-    uint32_t current_data_cluster = (uint32_t)entry->first_cluster_high << 16 | entry->first_cluster_low;
+    uint32_t current_data_cluster = first_cluster;
 
     while (bytes_read < entry->file_size && current_data_cluster < 0x0FFFFFF8) {
         uint32_t data_sector = cluster_to_lba(current_data_cluster);
+        vga_writestr("[FAT32] Reading sector 0x");
+        for (int i = 7; i >= 0; i--) {
+            char hex = "0123456789ABCDEF"[(data_sector >> (i * 4)) & 0xF];
+            char str[2] = {hex, 0};
+            vga_writestr(str);
+        }
+        vga_writestr("\n");
+
+        // Calculate how much to read
         uint32_t bytes_to_read = entry->file_size - bytes_read;
         uint32_t sectors_to_read = (bytes_to_read + 511) / 512;
-
         if (sectors_to_read > sectors_per_cluster) {
             sectors_to_read = sectors_per_cluster;
         }
 
+        vga_writestr("[FAT32] Reading ");
+        uint32_t_to_str(sectors_to_read, size_str);
+        vga_writestr(size_str);
+        vga_writestr(" sectors\n");
+
         // Read data
         if (!ata_read_sectors(data_sector, sectors_to_read, (uint8_t*)buffer + bytes_read)) {
+            vga_writestr("[FAT32] Failed to read data sectors\n");
             return false;
         }
 
         bytes_read += sectors_to_read * 512;
         current_data_cluster = fat32_get_next_cluster(current_data_cluster);
     }
+
+    vga_writestr("[FAT32] Successfully read ");
+    uint32_t_to_str(bytes_read, size_str);
+    vga_writestr(size_str);
+    vga_writestr(" bytes\n");
 
     return true;
 }

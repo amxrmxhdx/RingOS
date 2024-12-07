@@ -9,6 +9,9 @@
         "memory.h": "c",
         "fat32.h": "c",
         "vga.h": "c",
-        "types.h": "c"
+        "types.h": "c",
+        "cmath": "c",
+        "random": "c",
+        "*.tcc": "c"
     }
 }

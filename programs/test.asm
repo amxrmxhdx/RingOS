@@ -1,8 +1,13 @@
+; test.asm
 BITS 32
-ORG 0x100000
+org 0x101000
 
 start:
-    ; Write a single 'X' character at the top-left corner
-    mov byte [0xB8000], 'X'    ; Character
-    mov byte [0xB8001], 0x0F   ; White on black
-    ret                        ; Return to kernel
+    ; Do some work
+    mov eax, 0x12345
+    
+    ; Exit via syscall
+    mov eax, 0    ; SYSCALL_EXIT
+    int 0x80      ; Trigger syscall
+
+times 512 db 0
