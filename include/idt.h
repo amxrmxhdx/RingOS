@@ -3,22 +3,23 @@
 
 #include "types.h"
 
-// IDT entry structure
-typedef struct {
+struct idt_entry {
     uint16_t offset_low;    // Lower 16 bits of handler function address
     uint16_t selector;      // Kernel segment selector
-    uint8_t  zero;         // Always zero
-    uint8_t  flags;        // Type and attributes
+    uint8_t zero;          // Always zero
+    uint8_t type_attr;     // Type and attributes
     uint16_t offset_high;   // Higher 16 bits of handler function address
-} __attribute__((packed)) idt_entry_t;
+} __attribute__((packed));
 
-// IDT pointer structure
-typedef struct {
+struct idt_ptr {
     uint16_t limit;
     uint32_t base;
-} __attribute__((packed)) idt_ptr_t;
+} __attribute__((packed));
 
-void init_idt(void);
-void set_interrupt_handler(uint8_t num, void (*handler)(void));
+void idt_set_gate(uint8_t num, uint32_t handler, uint16_t sel, uint8_t flags);
+void idt_load();
+void isr_handler(struct registers_t regs);
+extern void isr0();
+void init_interrupts();
 
 #endif

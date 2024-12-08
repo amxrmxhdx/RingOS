@@ -1,32 +1,63 @@
 #include "idt.h"
 #include "string.h"
+#include "stdterm.h"
 
-#define IDT_SIZE 256
+struct idt_entry idt[256];
+struct idt_ptr idtp;
 
-static idt_entry_t idt[IDT_SIZE];
-static idt_ptr_t   idt_ptr;
-
-// Helper function to set an IDT entry
-static void idt_set_gate(uint8_t num, uint32_t base, uint16_t sel, uint8_t flags) {
-    idt[num].offset_low = (base & 0xFFFF);
+void idt_set_gate(uint8_t num, uint32_t handler, uint16_t sel, uint8_t flags) {
+    idt[num].offset_low = (handler & 0xFFFF);
     idt[num].selector = sel;
     idt[num].zero = 0;
-    idt[num].flags = flags;
-    idt[num].offset_high = (base >> 16) & 0xFFFF;
+    idt[num].type_attr = flags;
+    idt[num].offset_high = (handler >> 16) & 0xFFFF;
 }
 
-void init_idt(void) {
-    // Set up IDT pointer
-    idt_ptr.limit = (sizeof(idt_entry_t) * IDT_SIZE) - 1;
-    idt_ptr.base = (uint32_t)&idt;
+void syscall_print(const char* str) {
+    print(str);
+}
 
-    // Clear IDT
-    memset(&idt, 0, sizeof(idt_entry_t) * IDT_SIZE);
+void isr_handler(struct registers regs) {
+    // Handle syscalls specifically
+    if (regs.int_no == 0x80) {
+        // Your syscall handler here
+        // regs.eax typically contains the syscall number
+        // regs.ebx, regs.ecx, regs.edx are typically parameters
+        switch (regs.eax) {
+            case 1: // PRINT SYSCALL
+                syscall_print((const char*)regs.ebx);
+                break;
+            // Add more syscalls
+        }
+    } else {
+        // Handle other interrupts
+        println("Received interrupt: " + regs.int_no);
+    }
+}
 
+// Load the IDT
+void idt_load() {
+    idtp.limit = (sizeof(struct idt_entry) * 256) - 1;
+    idtp.base = (uint32_t)&idt;
+    
+    // Clear out the entire IDT first
+    memset(&idt, 0, sizeof(struct idt_entry) * 256);
+    
     // Load IDT
-    asm volatile("lidt %0" : : "m"(idt_ptr));
+    asm volatile ("lidt %0" : : "m"(idtp));
 }
 
-void set_interrupt_handler(uint8_t num, void (*handler)(void)) {
-    idt_set_gate(num, (uint32_t)handler, 0x08, 0x8E); // Present, Ring 0, 32-bit Interrupt Gate
+// Assembly interrupt handler wrapper
+extern void isr0();
+
+// Initialize interrupts
+void init_interrupts() {
+    // Initialize IDT
+    idt_load();
+    
+    // Set up interrupt handler for int 0x80 (syscalls)
+    idt_set_gate(0x80, (uint32_t)isr0, 0x08, 0x8E);
+    
+    // Enable interrupts
+    asm volatile ("sti");
 }
