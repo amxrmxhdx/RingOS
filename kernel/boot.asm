@@ -48,7 +48,8 @@ isr0:
     mov fs, ax
     mov gs, ax
 
-    push esp  ; Pass pointer to saved registers
+    push esp            ; Pass pointer to saved registers
+    cld                 ; Required by 32-bit System V ABI
     call isr_handler
     add esp, 4
 
@@ -76,7 +77,8 @@ isr80:
     mov fs, ax
     mov gs, ax
 
-    push esp  ; Pass pointer to saved registers
+    push esp            ; Pass pointer to saved registers
+    cld                 ; Required by 32-bit System V ABI
     call isr_handler
     add esp, 4
 
