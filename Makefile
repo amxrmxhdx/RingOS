@@ -29,7 +29,7 @@ DISK_SIZE_MB = 128
 # Main target
 all: os.bin objdump.txt $(DISK_IMAGE)
 
-# Compile C sources
+# Generate objdump.txt 
 objdump.txt: os.bin
 	$(OBJDUMP) -DxS $< >$@
 
