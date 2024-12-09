@@ -16,7 +16,7 @@ static void cmd_clear(void);
 
 static void print_prompt(void) {
     vga_set_color(VGA_CYAN, VGA_BLACK);
-    vga_writestr("\nuser");
+    vga_writestr("user");
     vga_set_color(VGA_MAGENTA, VGA_BLACK);
     vga_writestr("@");
     const char* path = fat32_get_current_path();
@@ -262,6 +262,8 @@ static void cmd_help(void) {
     vga_writestr("\n  cd - Change directory");
     vga_writestr("\n  cat - Read file content");
     vga_writestr("\n  exec - Execute a binary");
+    vga_writestr("\n");
+    print_prompt();
 }
 
 static void cmd_about(void) {
@@ -405,7 +407,7 @@ void shell_process_command(void) {
     else if (cmd_index > 0) {
         vga_writestr("\nUnknown command: ");
         vga_writestr(command);
-        vga_writestr("\nType 'help' for available commands\n");
+        vga_writestr("\nType 'help' for available commands.\n");
         print_prompt();
     }
     else {

@@ -26,5 +26,5 @@ void syscall_handler(void) {
 
 void init_syscalls(void) {
     // Set up syscall handler at interrupt 0x80
-    set_interrupt_handler(0x80, syscall_handler);
+    // set_interrupt_handler(0x80, syscall_handler);
 }

@@ -17,7 +17,7 @@ void syscall_print(const char* str) {
     print(str);
 }
 
-void isr_handler(struct registers regs) {
+void isr_handler(struct registers_t regs) {
     // Handle syscalls specifically
     if (regs.int_no == 0x80) {
         // Your syscall handler here
@@ -56,7 +56,7 @@ void init_interrupts() {
     idt_load();
     
     // Set up interrupt handler for int 0x80 (syscalls)
-    idt_set_gate(0x80, (uint32_t)isr0, 0x08, 0x8E);
+    // idt_set_gate(0x80, (uint32_t)isr0, 0x08, 0x8E);
     
     // Enable interrupts
     asm volatile ("sti");

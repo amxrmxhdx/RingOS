@@ -11,6 +11,22 @@ struct idt_entry {
     uint16_t offset_high;   // Higher 16 bits of handler function address
 } __attribute__((packed));
 
+struct registers_t {
+    // Pushed by pusha
+    uint32_t edi, esi, ebp, esp, ebx, edx, ecx, eax;
+    
+    // Pushed by our assembly stub
+    uint32_t int_no;   // Interrupt number
+    uint32_t err_code; // Error code (if applicable)
+    
+    // Pushed by CPU automatically
+    uint32_t eip;      // Instruction pointer
+    uint32_t cs;       // Code segment
+    uint32_t eflags;   // CPU flags
+    uint32_t useresp;  // User stack pointer
+    uint32_t ss;       // Stack segment
+} __attribute__((packed));
+
 struct idt_ptr {
     uint16_t limit;
     uint32_t base;
