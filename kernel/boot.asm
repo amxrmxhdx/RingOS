@@ -33,6 +33,9 @@ global isr0, isr80
 extern isr_handler
 
 isr0:
+    push 0              ; Push dummy error code
+                        ; (div by zero doesn't push one automatically)
+    push 0              ; Push interrupt number
     pusha
     push ds
     push es
@@ -45,7 +48,7 @@ isr0:
     mov fs, ax
     mov gs, ax
 
-    push eax  ; Pass pointer to saved registers
+    push esp  ; Pass pointer to saved registers
     call isr_handler
     add esp, 4
 
@@ -54,9 +57,13 @@ isr0:
     pop es
     pop ds
     popa
+    add esp, 8          ; Remove the interrupt and error code from stacl
     iret
 
 isr80:
+    push 0              ; Push dummy error code
+                        ; (software interrupts don't push one automatically)
+    push 0x80           ; Push interrupt number
     pusha
     push ds
     push es
@@ -69,7 +76,7 @@ isr80:
     mov fs, ax
     mov gs, ax
 
-    push eax  ; Pass pointer to saved registers
+    push esp  ; Pass pointer to saved registers
     call isr_handler
     add esp, 4
 
@@ -78,12 +85,15 @@ isr80:
     pop es
     pop ds
     popa
+
+    add esp, 8          ; Remove the interrupt and error code from stacl
     iret
 
 global gdt_flush
 
 gdt_flush:
-    lgdt [esp+4]        ; Load GDT descriptor from stack
+    mov eax, [esp+4]
+    lgdt [eax]          ; Load GDT descriptor from stack
     mov ax, 0x10        ; Load data segment selector
     mov ds, ax
     mov es, ax
@@ -99,5 +109,6 @@ gdt_flush:
 global idt_flush
 
 idt_flush:
-    lidt [esp+4]    ; Load IDT descriptor from stack
+    mov eax, [esp+4]
+    lidt [eax]          ; Load IDT descriptor from stack
     ret
