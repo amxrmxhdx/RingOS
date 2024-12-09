@@ -3,17 +3,15 @@
 #include <ata.h>
 #include <fat32.h>
 #include "shell.h"
-// #include "idt.h"
-// #include "system.h"
+#include "idt.h"
+#include "gdt.h"
 
 void kernel_main(void) {
     // Initialize basic hardware
     vga_init();
     keyboard_init();
-    // init_idt();
-    // init_syscalls();
-
-    // asm volatile("sti");
+    init_gdt();
+    init_interrupts();
     
     vga_writestr("Initializing hardware...\n");
     

@@ -14,16 +14,14 @@ align 4
 section .bss
 align 16
 stack_bottom:
-    resb 16384 ; 16 KiB
+    resb 16384         ; 16 KiB stack
 stack_top:
 
 section .text
 global _start
 extern kernel_main
-
 _start:
-    ; Initialize stack
-    mov esp, stack_top
+    mov esp, stack_top ; Set up the stack pointer
     
     ; Reset EFLAGS
     push 0
@@ -57,3 +55,53 @@ _start:
 .hang:
     hlt
     jmp .hang
+
+global isr80
+extern isr80_handler
+
+section .text
+isr80:
+    push ds
+    push es
+    push fs
+    push gs
+    pusha
+
+    mov ax, 0x10
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+
+    ; Now ESP points to the saved registers (the layout that matches registers_t)
+    ; Pass ESP as an argument to isr80_handler
+    mov eax, esp
+    push eax
+    call isr80_handler
+    add esp, 4
+
+    popa
+    pop gs
+    pop fs
+    pop es
+    pop ds
+    iret
+
+global gdt_flush
+extern gp
+gdt_flush:
+    ; Load the GDT pointer into the GDTR
+    lgdt [gp]
+
+    ; Reload segment registers with new GDT values
+    mov ax, 0x10        ; Data segment selector (GDT entry 2)
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+    mov ss, ax
+
+    ; Reload code segment
+    jmp 0x08:.flush     ; Jump to code segment selector (GDT entry 1)
+.flush:
+    ret

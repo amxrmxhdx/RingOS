@@ -1,15 +1,16 @@
 #include "idt.h"
 #include "string.h"
 #include "stdterm.h"
+#include "vga.h"
 
 struct idt_entry idt[256];
 struct idt_ptr idtp;
 
 void idt_set_gate(uint8_t num, uint32_t handler, uint16_t sel, uint8_t flags) {
     idt[num].offset_low = (handler & 0xFFFF);
-    idt[num].selector = sel;
+    idt[num].selector = sel;    // GDT selector (e.g., 0x08 for code segment)
     idt[num].zero = 0;
-    idt[num].type_attr = flags;
+    idt[num].type_attr = flags; // 0x8E = present, ring 0, 32-bit interrupt gate
     idt[num].offset_high = (handler >> 16) & 0xFFFF;
 }
 
@@ -18,20 +19,8 @@ void syscall_print(const char* str) {
 }
 
 void isr_handler(struct registers_t regs) {
-    // Handle syscalls specifically
     if (regs.int_no == 0x80) {
-        // Your syscall handler here
-        // regs.eax typically contains the syscall number
-        // regs.ebx, regs.ecx, regs.edx are typically parameters
-        switch (regs.eax) {
-            case 1: // PRINT SYSCALL
-                syscall_print((const char*)regs.ebx);
-                break;
-            // Add more syscalls
-        }
-    } else {
-        // Handle other interrupts
-        println("Received interrupt: " + regs.int_no);
+        isr80_handler(&regs);
     }
 }
 
@@ -47,17 +36,34 @@ void idt_load() {
     asm volatile ("lidt %0" : : "m"(idtp));
 }
 
-// Assembly interrupt handler wrapper
-extern void isr0();
-
 // Initialize interrupts
 void init_interrupts() {
-    // Initialize IDT
+    
+    idt_set_gate(0x00, (uint32_t)isr80, 0x08, 0x8E);  // Divide Error Exception
     idt_load();
-    
-    // Set up interrupt handler for int 0x80 (syscalls)
-    // idt_set_gate(0x80, (uint32_t)isr0, 0x08, 0x8E);
-    
-    // Enable interrupts
-    asm volatile ("sti");
+}
+
+void isr80_handler(struct registers_t *regs) {
+    uint32_t syscall_number = regs->eax;
+    uint32_t arg1 = regs->ebx;
+    uint32_t arg2 = regs->ecx;
+    uint32_t arg3 = regs->edx;
+
+    regs->eax = handle_syscall(syscall_number, arg1, arg2, arg3);
+}
+
+uint32_t handle_syscall(uint32_t num, uint32_t arg1, uint32_t arg2, uint32_t arg3) {
+    vga_writestr("Got interrupt!\n");
+    switch(num) {
+        case 0:
+            // Empty syscall
+            return 42;
+        case 1:
+            // Print syscall
+            vga_writestr((const char*)arg1);
+            return 0;
+        default:
+            // Unknown syscall
+            return (uint32_t)-1;
+    }
 }

@@ -404,6 +404,11 @@ void shell_process_command(void) {
     else if (strcmp(command, "exec") == 0) {
         cmd_exec(arg);
     }
+    else if (strcmp(command, "int") == 0) {
+        int x = 1 / 0;  // Should trigger interrupt 0x00 (divide error)
+
+        print_prompt();
+    }
     else if (cmd_index > 0) {
         vga_writestr("\nUnknown command: ");
         vga_writestr(command);

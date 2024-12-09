@@ -12,6 +12,7 @@
         "types.h": "c",
         "cmath": "c",
         "random": "c",
-        "*.tcc": "c"
+        "*.tcc": "c",
+        "idt.h": "c"
     }
 }
