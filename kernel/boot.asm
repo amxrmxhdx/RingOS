@@ -57,7 +57,7 @@ isr0:
     pop es
     pop ds
     popa
-    add esp, 8          ; Remove the interrupt and error code from stacl
+    add esp, 8          ; Remove the interrupt and error code from stack
     iret
 
 isr80:
@@ -86,7 +86,7 @@ isr80:
     pop ds
     popa
 
-    add esp, 8          ; Remove the interrupt and error code from stacl
+    add esp, 8          ; Remove the interrupt and error code from stack
     iret
 
 global gdt_flush
