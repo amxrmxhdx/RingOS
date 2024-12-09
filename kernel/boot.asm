@@ -14,58 +14,30 @@ align 4
 section .bss
 align 16
 stack_bottom:
-    resb 16384         ; 16 KiB stack
+    resb 16384          ; 16 KB stack
 stack_top:
 
 section .text
 global _start
 extern kernel_main
 _start:
-    mov esp, stack_top ; Set up the stack pointer
-    
-    ; Reset EFLAGS
-    push 0
-    popf
-    
-    ; Clear screen and reset attributes
-    mov edi, 0xB8000
-    mov ax, 0x0F20   ; Black background (0), white foreground (F), space character (20)
-    mov ecx, 80*25   ; Full screen
-    rep stosw        ; Fill screen with default attributes
-    
-    ; Reset cursor position
-    mov dx, 0x3D4
-    mov al, 0x0F
-    out dx, al
-    inc dx
-    xor al, al
-    out dx, al
-    dec dx
-    mov al, 0x0E
-    out dx, al
-    inc dx
-    xor al, al
-    out dx, al
-    
-    ; Call kernel
-    call kernel_main
-
-    ; Halt if kernel returns
+    mov esp, stack_top  ; Set up stack pointer
+    call kernel_main    ; Call the kernel's main function
     cli
 .hang:
-    hlt
+    hlt                 ; Halt the CPU
     jmp .hang
 
-global isr80
-extern isr80_handler
 
-section .text
-isr80:
+global isr0, isr80
+extern isr_handler
+
+isr0:
+    pusha
     push ds
     push es
     push fs
     push gs
-    pusha
 
     mov ax, 0x10
     mov ds, ax
@@ -73,35 +45,59 @@ isr80:
     mov fs, ax
     mov gs, ax
 
-    ; Now ESP points to the saved registers (the layout that matches registers_t)
-    ; Pass ESP as an argument to isr80_handler
-    mov eax, esp
-    push eax
-    call isr80_handler
+    push eax  ; Pass pointer to saved registers
+    call isr_handler
     add esp, 4
 
-    popa
     pop gs
     pop fs
     pop es
     pop ds
+    popa
+    iret
+
+isr80:
+    pusha
+    push ds
+    push es
+    push fs
+    push gs
+
+    mov ax, 0x10
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+
+    push eax  ; Pass pointer to saved registers
+    call isr_handler
+    add esp, 4
+
+    pop gs
+    pop fs
+    pop es
+    pop ds
+    popa
     iret
 
 global gdt_flush
-extern gp
-gdt_flush:
-    ; Load the GDT pointer into the GDTR
-    lgdt [gp]
 
-    ; Reload segment registers with new GDT values
-    mov ax, 0x10        ; Data segment selector (GDT entry 2)
+gdt_flush:
+    lgdt [esp+4]        ; Load GDT descriptor from stack
+    mov ax, 0x10        ; Load data segment selector
     mov ds, ax
     mov es, ax
     mov fs, ax
     mov gs, ax
     mov ss, ax
-
-    ; Reload code segment
-    jmp 0x08:.flush     ; Jump to code segment selector (GDT entry 1)
+    ; Far jump to reload the code segment
+    jmp 0x08:.flush
+    
 .flush:
+    ret
+
+global idt_flush
+
+idt_flush:
+    lidt [esp+4]    ; Load IDT descriptor from stack
     ret

@@ -11,7 +11,7 @@ void kernel_main(void) {
     vga_init();
     keyboard_init();
     init_gdt();
-    init_interrupts();
+    init_idt();
     
     vga_writestr("Initializing hardware...\n");
     
