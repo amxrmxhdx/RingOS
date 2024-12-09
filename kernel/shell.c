@@ -259,9 +259,9 @@ static void cmd_help(void) {
     vga_writestr("\n  mkdir  - Create a new directory");
     vga_writestr("\n  writeb - Write binary file (hex format)");
     vga_writestr("\n  readb  - Read binary file (hex format)");
-    vga_writestr("\n  cd - Change directory");
-    vga_writestr("\n  cat - Read file content");
-    vga_writestr("\n  exec - Execute a binary");
+    vga_writestr("\n  cd     - Change directory");
+    vga_writestr("\n  cat    - Read file content");
+    vga_writestr("\n  exec   - Execute a binary");
     vga_writestr("\n");
     print_prompt();
 }
