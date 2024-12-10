@@ -1,50 +1,51 @@
 #ifndef CLIB_STDIO_H
 #define CLIB_STDIO_H
 
-#include <types.h>
+#include "types.h"
+#include "system.h"
 
-typedef __builtin_va_list va_list;
-#define va_start(v,l) __builtin_va_start(v,l)
-#define va_end(v) __builtin_va_end(v)
-#define va_arg(v,l) __builtin_va_arg(v,l)
+typedef char* va_list;
 
-static inline int syscall1(int syscall_num, void* arg) {
-    int ret;
-    asm volatile(
-        "int $0x80"
-        : "=a"(ret)
-        : "a"(syscall_num), "b"(arg)
-        : "memory"
-    );
-    return ret;
+#define VA_ALIGN(t) (((sizeof(t) + sizeof(int) - 1) / sizeof(int)) * sizeof(int))
+#define va_start(ap, last) (ap = (char*)&last + VA_ALIGN(last))
+#define va_arg(ap, t) (*(t *)((ap += VA_ALIGN(t)) - VA_ALIGN(t)))
+#define va_end(ap) (ap = NULL)
+
+static void printc(char c) {
+    syscall_printc(c);
+}
+
+static void prints(const char* str) {
+    syscall_prints(str);
 }
 
 static void print_number(int num, int base) {
     static const char digits[] = "0123456789abcdef";
     char buf[32];
     int i = 0;
-    
+
     // Handle negative numbers for decimal
+    unsigned int abs_num = (unsigned int)num;
     if (base == 10 && num < 0) {
-        vga_putchar('-');
-        num = -num;
+        printc('-');
+        abs_num = (unsigned int)(-num);
     }
-    
+
     // Handle case of 0
-    if (num == 0) {
-        vga_putchar('0');
+    if (abs_num == 0) {
+        printc('0');
         return;
     }
-    
+
     // Convert to string in reverse order
-    while (num > 0) {
-        buf[i++] = digits[num % base];
-        num /= base;
+    while (abs_num > 0) {
+        buf[i++] = digits[abs_num % base];
+        abs_num /= base;
     }
-    
+
     // Print in correct order
     while (--i >= 0) {
-        vga_putchar(buf[i]);
+        printc(buf[i]);
     }
 }
 
@@ -53,11 +54,11 @@ static void print_hex(uint32_t num) {
     char buf[32];
     int i = 0;
     
-    vga_writestr("0x");
+    prints("0x");
     
     // Handle case of 0
     if (num == 0) {
-        vga_putchar('0');
+        printc('0');
         return;
     }
     
@@ -67,59 +68,56 @@ static void print_hex(uint32_t num) {
     }
     
     while (--i >= 0) {
-        vga_putchar(buf[i]);
+        printc(buf[i]);
     }
 }
 
-void printf(const char* format, ...) {
+/* void printf(const char* format, ...) {
     va_list args;
     va_start(args, format);
     
     while (*format) {
         if (*format != '%') {
-            vga_putchar(*format);
+            printc(*format);
             format++;
             continue;
         }
         
         format++; // Skip the %
         switch (*format) {
-            case 'd': {
+            case 'c':
+                // Use `int` for characters because `char` is promoted to `int`
+                int c = va_arg(args, int);
+                printc((char)c);
+                break;
+
+            case 's':
+                // Strings are passed as `const char*`
+                const char* str = va_arg(args, const char*);
+                if (str) {
+                    prints(str);
+                } else {
+                    prints("(null)");
+                }
+                break;
+
+            case 'd':
+                // Use `int` for integers
                 int num = va_arg(args, int);
                 print_number(num, 10);
                 break;
-            }
-            
-            case 'x': {
-                uint32_t num = va_arg(args, uint32_t);
-                print_hex(num);
+            case 'x':
+                // Use `unsigned int` or `uint32_t` for hexadecimal
+                uint32_t num1 = va_arg(args, uint32_t);
+                print_hex(num1);
                 break;
-            }
-            
-            case 'c': {
-                // Note: char is promoted to int when passed through ...
-                int c = va_arg(args, int);
-                vga_putchar((char)c);
-                break;
-            }
-            
-            case 's': {
-                const char* str = va_arg(args, const char*);
-                if (str) {
-                    vga_writestr(str);
-                } else {
-                    vga_writestr("(null)");
-                }
-                break;
-            }
-            
             case '%':
-                vga_putchar('%');
+                printc('%');
                 break;
                 
             default:
-                vga_putchar('%');
-                vga_putchar(*format);
+                printc('%');
+                printc(*format);
                 break;
         }
         format++;
@@ -127,6 +125,5 @@ void printf(const char* format, ...) {
     
     va_end(args);
 }
-
-
+ */
 #endif // CLIB_STDIO_H

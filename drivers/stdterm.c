@@ -13,6 +13,10 @@ void println(const char* str) {
   vga_putchar('\n');
 }
 
+void printChar(char c) {
+  vga_putchar(c);
+}
+
 void clearScreen() {
   vga_clear();
 }

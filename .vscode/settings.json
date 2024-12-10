@@ -13,6 +13,8 @@
         "cmath": "c",
         "random": "c",
         "*.tcc": "c",
-        "idt.h": "c"
+        "idt.h": "c",
+        "stdterm.h": "c",
+        "stdio.h": "c"
     }
 }
