@@ -4,9 +4,9 @@ LD = $(CROSS_COMPILE)ld
 AS = nasm
 OBJCOPY = $(CROSS_COMPILE)objcopy
 OBJDUMP = $(CROSS_COMPILE)objdump
-ASFLAGS = -f elf32
+ASFLAGS = -g -f elf32
 
-CFLAGS = -m32 -ffreestanding -O2 -Wall -Wextra -fno-pic -Iinclude
+CFLAGS = -m32 -g -mpreferred-stack-boundary=2 -ffreestanding -O2 -Wall -Wextra -fno-pic -Iinclude
 LDFLAGS = -m elf_i386 -T link.ld -nostdlib
 
 # Directories
@@ -27,7 +27,11 @@ DISK_IMAGE = disk.img
 DISK_SIZE_MB = 128
 
 # Main target
-all: os.bin $(DISK_IMAGE)
+all: os.bin objdump.txt $(DISK_IMAGE)
+
+# Generate objdump.txt 
+objdump.txt: os.bin
+	$(OBJDUMP) -DxS $< >$@
 
 # Compile C sources
 %.o: %.c $(HEADERS)
@@ -56,4 +60,5 @@ clean:
 
 # Run in QEMU
 run: os.bin $(DISK_IMAGE)
-	qemu-system-i386 -kernel os.bin -drive file=$(DISK_IMAGE),format=raw,if=ide -vga vmware
+	qemu-system-i386 -kernel os.bin -drive file=$(DISK_IMAGE),format=raw,if=ide -vga vmware \
+		-d int -no-reboot -no-shutdown -monitor stdio

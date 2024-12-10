@@ -406,7 +406,12 @@ void shell_process_command(void) {
     }
     else if (strcmp(command, "int") == 0) {
         // Test divide-by-zero
-        int x = 1 / 0;
+// In C/C++ division by 0 is undefined behaviour
+//        int x = 1 / 0;
+        // Div by 0 is a fault and will return back to the faulting
+        // instruction (not the instruction after it unless an
+        // interrupt handler changes the return address.
+//        asm volatile ("div %b0" :: "a"(0));
 
         // Test syscall
         asm volatile("int $0x80");
