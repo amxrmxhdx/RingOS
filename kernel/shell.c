@@ -3,7 +3,7 @@
 #include <keyboard.h>
 #include <fat32.h>
 #include <loader.h>
-#include <libc/stdio.h>
+#include "libc/stdio.h"
 
 #define MAX_CMD_LENGTH 256
 
@@ -407,6 +407,7 @@ void shell_process_command(void) {
     }
     else if (strcmp(command, "int") == 0) {
         prints("Hello from syscall\n");
+        syscall_exit(0);
         print_prompt();
     }
     else if (cmd_index > 0) {
