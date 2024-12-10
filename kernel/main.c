@@ -1,7 +1,7 @@
 #include <vga.h>
 #include <keyboard.h>
 #include <ata.h>
-#include <fat32.h>
+#include "libc/fileio.h"
 #include "shell.h"
 #include "idt.h"
 #include "gdt.h"
@@ -44,11 +44,10 @@ void kernel_main(void) {
     
     // Initialize filesystem
     vga_writestr("Initializing filesystem... ");
-    if (!fat32_init()) {
-        vga_writestr("Failed!\n");
-        vga_writestr("WARNING: Filesystem commands will be unavailable.\n");
-    } else {
-        vga_writestr("OK\n");
+    if (!fs_init()) {
+        vga_writestr("Failed.\n");
+        vga_writestr("System halted.\n");
+        while(1);
     }
     
     // Start shell

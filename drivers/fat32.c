@@ -15,6 +15,9 @@ static directory_entry_t current_directory;
 static directory_entry_t parent_directories[16];
 static int directory_depth = 0;
 
+static fat32_dir_entry_t found_entry;
+static bool file_found = false;
+
 static void uint32_to_str(uint32_t num, char* str) {
     char rev[11];
     int i = 0;
@@ -750,4 +753,33 @@ bool fat32_read_file(const char* name, void* buffer, uint32_t* size) {
     vga_writestr(" bytes\n");
 
     return true;
+}
+
+static void search_callback(const char* file_name, uint32_t size, uint8_t attr) {
+    if (strcmp(file_name, found_entry.name) == 0) {
+        file_found = true;
+        // Fill in the details (e.g., size, attributes)
+        found_entry.file_size = size;
+        found_entry.attributes = attr;
+    }
+}
+
+bool fat32_find_file(const char* name, fat32_dir_entry_t* entry) {
+    // Reset search result
+    file_found = false;
+    memset(&found_entry, 0, sizeof(found_entry));
+
+    // Copy the name for comparison in the callback
+    memcpy(found_entry.name, name, 11);
+
+    // List the directory and search for the file
+    fat32_list_directory(search_callback);
+
+    // If the file was found, copy the result into the provided entry
+    if (file_found) {
+        memcpy(entry, &found_entry, sizeof(fat32_dir_entry_t));
+        return true;
+    }
+
+    return false;
 }
