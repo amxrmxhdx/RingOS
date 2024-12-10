@@ -10,8 +10,15 @@ void kernel_main(void) {
     // Initialize basic hardware
     vga_init();
     keyboard_init();
+
+    vga_writestr("GDT init starting...\n");
     init_gdt();
+    vga_writestr("GDT init done.\n");
+
+    vga_writestr("IDT init starting...\n");
     init_idt();
+    vga_writestr("IDT init done.\n");
+
     
     vga_writestr("Initializing hardware...\n");
     

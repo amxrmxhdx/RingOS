@@ -14,20 +14,47 @@ align 4
 section .bss
 align 16
 stack_bottom:
-    resb 16384          ; 16 KB stack
+    resb 16384         ; 16 KiB stack
 stack_top:
 
 section .text
 global _start
 extern kernel_main
 _start:
-    mov esp, stack_top  ; Set up stack pointer
-    call kernel_main    ; Call the kernel's main function
+    mov esp, stack_top ; Set up the stack pointer
+    
+    ; Reset EFLAGS
+    push 0
+    popf
+    
+    ; Clear screen and reset attributes
+    mov edi, 0xB8000
+    mov ax, 0x0F20   ; Black background (0), white foreground (F), space character (20)
+    mov ecx, 80*25   ; Full screen
+    rep stosw        ; Fill screen with default attributes
+    
+    ; Reset cursor position
+    mov dx, 0x3D4
+    mov al, 0x0F
+    out dx, al
+    inc dx
+    xor al, al
+    out dx, al
+    dec dx
+    mov al, 0x0E
+    out dx, al
+    inc dx
+    xor al, al
+    out dx, al
+    
+    ; Call kernel
+    call kernel_main
+
+    ; Halt if kernel returns
     cli
 .hang:
-    hlt                 ; Halt the CPU
+    hlt
     jmp .hang
-
 
 global isr0, isr80
 extern isr_handler
@@ -83,21 +110,19 @@ isr80:
 global gdt_flush
 
 gdt_flush:
-    lgdt [esp+4]        ; Load GDT descriptor from stack
+    lgdt [esp+4]        ; Load GDT descriptor
     mov ax, 0x10        ; Load data segment selector
     mov ds, ax
     mov es, ax
     mov fs, ax
     mov gs, ax
     mov ss, ax
-    ; Far jump to reload the code segment
-    jmp 0x08:.flush
-    
+    jmp 0x08:.flush     ; Far jump to reload code segment
 .flush:
     ret
 
 global idt_flush
 
 idt_flush:
-    lidt [esp+4]    ; Load IDT descriptor from stack
+    lidt [esp+4]        ; Load IDT descriptor
     ret
