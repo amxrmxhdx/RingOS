@@ -237,16 +237,23 @@ void cmd_exec(const char* filename) {
         }
     }
     vga_writestr("]\n");
+    vga_writestr("Debug B: About to call load_program\n");
+    program_info_t prog_info = {0};  // Initialize struct
 
-    program_info_t prog_info;
     if (!load_program(fat_name, &prog_info)) {
         vga_writestr("Error: Could not load program\n");
         return;
     }
 
+    vga_writestr("Debug C: load_program returned successfully\n");
     vga_writestr("Program loaded successfully. Executing...\n");
+
+    vga_writestr("Debug D: About to call jump_to_program\n");
     jump_to_program(prog_info.entry_point, prog_info.stack_pointer);
-    vga_writestr("Program execution completed\n");
+    vga_writestr("Debug E: Returned from jump_to_program\n");
+
+    keyboard_init();
+    print_prompt();
 }
 
 static void cmd_help(void) {
@@ -267,15 +274,50 @@ static void cmd_help(void) {
     print_prompt();
 }
 
+void get_cpu_name(char *buffer) {
+    uint32_t cpu_info[4] = {0};
+
+    __asm__("cpuid"
+            : "=a"(cpu_info[0]), "=b"(cpu_info[1]), "=c"(cpu_info[2]), "=d"(cpu_info[3])
+            : "a"(0x80000002));
+    *(uint32_t *)(buffer) = cpu_info[0];
+    *(uint32_t *)(buffer + 4) = cpu_info[1];
+    *(uint32_t *)(buffer + 8) = cpu_info[2];
+    *(uint32_t *)(buffer + 12) = cpu_info[3];
+
+    __asm__("cpuid"
+            : "=a"(cpu_info[0]), "=b"(cpu_info[1]), "=c"(cpu_info[2]), "=d"(cpu_info[3])
+            : "a"(0x80000003));
+    *(uint32_t *)(buffer + 16) = cpu_info[0];
+    *(uint32_t *)(buffer + 20) = cpu_info[1];
+    *(uint32_t *)(buffer + 24) = cpu_info[2];
+    *(uint32_t *)(buffer + 28) = cpu_info[3];
+
+    __asm__("cpuid"
+            : "=a"(cpu_info[0]), "=b"(cpu_info[1]), "=c"(cpu_info[2]), "=d"(cpu_info[3])
+            : "a"(0x80000004));
+    *(uint32_t *)(buffer + 32) = cpu_info[0];
+    *(uint32_t *)(buffer + 36) = cpu_info[1];
+    *(uint32_t *)(buffer + 40) = cpu_info[2];
+    *(uint32_t *)(buffer + 44) = cpu_info[3];
+
+    buffer[48] = '\0';
+}
+
 static void cmd_about(void) {
+    char cpu_name[49];
+    get_cpu_name(cpu_name);
+
     vga_set_color(VGA_RED, VGA_BLACK);
     vga_writestr("           ####           ");
     vga_set_color(VGA_WHITE, VGA_BLACK);
-    vga_writestr("RingOS - Hobby Operating System\n");
+    vga_writestr("RingOS - Version 0.1\n");
     vga_set_color(VGA_BLUE, VGA_BLACK);
     vga_writestr("        ##########        ");
     vga_set_color(VGA_WHITE, VGA_BLACK);
-    vga_writestr("Version 0.1\n");
+    vga_writestr("CPU: ");
+    vga_writestr(cpu_name);
+    vga_writestr("\n");
     vga_set_color(VGA_GREEN, VGA_BLACK);
     vga_writestr("      ##############      ");
     vga_set_color(VGA_WHITE, VGA_BLACK);
@@ -483,4 +525,11 @@ void shell_run(void) {
             shell_handle_keypress(c);
         }
     }
+}
+
+void shell_return_from_program(void) {
+    keyboard_init();
+    shell_init();
+    shell_run();
+    vga_writestr("\nProgram exited\n");
 }

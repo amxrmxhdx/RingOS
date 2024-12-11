@@ -2,6 +2,7 @@
 #include "stdterm.h"
 #include "shell.h"
 #include "libc/fileio.h"
+#include "keyboard.h"
 
 void isr_handler(struct registers_t *regs) {
     uint32_t int_no = regs->int_no;
@@ -13,10 +14,9 @@ void isr_handler(struct registers_t *regs) {
     if (int_no == 0x80) {
         switch (syscall_num) {
             // Return to shell
-            case 0:
-                shell_init();
-                shell_run();
-                break;
+            case 0: // Exit syscall
+                print("Program exited\n");
+                shell_return_from_program();
             case 1:
                 printChar((char) arg1);
                 break;

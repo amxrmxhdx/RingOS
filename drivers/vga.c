@@ -20,12 +20,12 @@ void vga_init(void) {
     // Force black background (0), white foreground (15)
     vga_color = VGA_COLOR(VGA_WHITE, VGA_BLACK);  // 00001111 in binary
     cursor_pos = 0;
-    
+
     // Fill entire screen with spaces using our color
     for (int i = 0; i < VGA_WIDTH * VGA_HEIGHT; i++) {
         vga_buffer[i] = vga_entry(' ', vga_color);
     }
-    
+
     // Reset cursor
     vga_set_cursor_pos(0);
 }
@@ -33,13 +33,13 @@ void vga_init(void) {
 void vga_putchar(char c) {
     if (c == '\n') {
         cursor_pos = (cursor_pos / VGA_WIDTH + 1) * VGA_WIDTH;
-    } 
+    }
     else if (c == '\b') {
         if (cursor_pos > 0) {
             cursor_pos--;
             vga_buffer[cursor_pos] = vga_entry(' ', vga_color);
         }
-    } 
+    }
     else {
         vga_buffer[cursor_pos] = vga_entry(c, vga_color);
         cursor_pos++;
@@ -65,6 +65,17 @@ void vga_writestr(const char* str) {
     for (size_t i = 0; str[i] != '\0'; i++) {
         vga_putchar(str[i]);
     }
+}
+
+void vga_writehex(uint32_t n) {
+    char buf[9];
+    for (int i = 0; i < 8; i++) {
+        uint8_t nibble = (n >> (4 * (7 - i))) & 0xF;
+        buf[i] = (nibble < 10) ? ('0' + nibble) : ('A' + nibble - 10);
+    }
+    buf[8] = '\0';
+    vga_writestr("0x");
+    vga_writestr(buf);
 }
 
 void vga_clear(void) {

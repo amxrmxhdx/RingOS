@@ -32,6 +32,7 @@ void vga_clear(void);
 void vga_set_color(uint8_t fg, uint8_t bg);
 void vga_putchar(char c);
 void vga_writestr(const char* str);
+void vga_writehex(uint32_t n);
 void vga_set_cursor_pos(uint16_t pos);
 
 #endif /* RINGOS_VGA_H */
