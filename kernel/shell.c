@@ -31,14 +31,14 @@ static void ls_callback(const char* name, uint32_t size, uint8_t attr) {
     char size_str[16];
     int len = 0;
     uint32_t temp = size;
-    
+
     // Convert size to string
     do {
         size_str[len++] = '0' + (temp % 10);
         temp /= 10;
     } while (temp > 0);
     size_str[len] = '\0';
-    
+
     // Print file information
     vga_writestr(name);
     vga_writestr("    ");
@@ -119,12 +119,12 @@ void cmd_cat(const char* filename) {
     // Create a FAT formatted name
     char fat_name[11];
     memset(fat_name, ' ', 11);
-    
+
     // Copy name part (up to 8 chars)
     const char* dot = filename;
     size_t name_len = 0;
     while (*dot && *dot != '.' && name_len < 8) {
-        fat_name[name_len] = (*dot >= 'a' && *dot <= 'z') ? 
+        fat_name[name_len] = (*dot >= 'a' && *dot <= 'z') ?
                             (*dot - 'a' + 'A') : *dot;
         dot++;
         name_len++;
@@ -135,7 +135,7 @@ void cmd_cat(const char* filename) {
         dot++; // Skip the dot
         size_t ext_pos = 8;
         while (*dot && ext_pos < 11) {
-            fat_name[ext_pos] = (*dot >= 'a' && *dot <= 'z') ? 
+            fat_name[ext_pos] = (*dot >= 'a' && *dot <= 'z') ?
                                (*dot - 'a' + 'A') : *dot;
             dot++;
             ext_pos++;
@@ -156,7 +156,7 @@ void cmd_cat(const char* filename) {
     // Read file
     if (!fat32_read_file(fat_name, buffer, &size)) {
         vga_writestr("Error: File not found or error reading file (size=");
-        
+
         // Convert size to string for debug output
         char size_str[16];
         int idx = 0;
@@ -166,13 +166,13 @@ void cmd_cat(const char* filename) {
             temp /= 10;
         } while (temp > 0);
         size_str[idx] = '\0';
-        
+
         // Print digits in reverse order
         while (idx > 0) {
             char c[2] = {size_str[--idx], '\0'};
             vga_writestr(c);
         }
-        
+
         vga_writestr(")\n");
         return;
     }
@@ -193,7 +193,7 @@ void cmd_exec(const char* filename) {
     char fat_name[12];
     memset(fat_name, ' ', 11);  // Fill with spaces
     fat_name[11] = '\0';
-    
+
     // First, find the dot
     const char* dot = filename;
     size_t name_len = 0;
@@ -407,7 +407,7 @@ void shell_process_command(void) {
     }
     else if (strcmp(command, "int") == 0) {
         prints("Hello from syscall\n");
-        syscall_exit(0);
+        // syscall_exit(0);
         print_prompt();
     }
     else if (cmd_index > 0) {
