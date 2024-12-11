@@ -17,6 +17,11 @@ static uint16_t vga_entry(char c, uint8_t color) {
 }
 
 void vga_init(void) {
+    outb(0x3C2, 0xE7);
+
+    outb(0x3D4, 0x11);
+    outb(0x3D5, 0x7F);
+
     // Force black background (0), white foreground (15)
     vga_color = VGA_COLOR(VGA_WHITE, VGA_BLACK);  // 00001111 in binary
     cursor_pos = 0;
