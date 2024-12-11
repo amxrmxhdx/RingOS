@@ -252,7 +252,6 @@ void cmd_exec(const char* filename) {
     jump_to_program(prog_info.entry_point, prog_info.stack_pointer);
     vga_writestr("Debug E: Returned from jump_to_program\n");
 
-    keyboard_init();
     print_prompt();
 }
 
@@ -528,7 +527,6 @@ void shell_run(void) {
 }
 
 void shell_return_from_program(void) {
-    keyboard_init();
     shell_init();
     vga_writestr("\nProgram exited\n");
 }

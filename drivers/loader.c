@@ -73,6 +73,6 @@ void jump_to_program(uint32_t entry_point, uint32_t stack_pointer) {
         : "memory"
     );
 
-    vga_writestr("Program completed, returning to shell\n");
     keyboard_init();
+    vga_writestr("Program completed, returning to shell\n");
 }
