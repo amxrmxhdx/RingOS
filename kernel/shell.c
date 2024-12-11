@@ -268,8 +268,36 @@ static void cmd_help(void) {
 }
 
 static void cmd_about(void) {
-    vga_writestr("\nRingOS v0.1");
-    vga_writestr("\nA minimal operating system with FAT32 support");
+    vga_set_color(VGA_RED, VGA_BLACK);
+    vga_writestr("           ####           ");
+    vga_set_color(VGA_WHITE, VGA_BLACK);
+    vga_writestr("RingOS - Hobby Operating System\n");
+    vga_set_color(VGA_BLUE, VGA_BLACK);
+    vga_writestr("        ##########        ");
+    vga_set_color(VGA_WHITE, VGA_BLACK);
+    vga_writestr("Version 0.1\n");
+    vga_set_color(VGA_GREEN, VGA_BLACK);
+    vga_writestr("      ##############      ");
+    vga_set_color(VGA_WHITE, VGA_BLACK);
+    vga_writestr("Video: VGA 80x25 text mode\n");
+    vga_set_color(VGA_MAGENTA, VGA_BLACK);
+    vga_writestr("     #####      #####     ");
+    vga_set_color(VGA_WHITE, VGA_BLACK);
+    vga_writestr("Filesystem: FAT32\n");
+    vga_set_color(VGA_CYAN, VGA_BLACK);
+    vga_writestr("    #####        #####    \n");
+    vga_set_color(VGA_LIGHT_BLUE, VGA_BLACK);
+    vga_writestr("    #####        #####    \n");
+    vga_set_color(VGA_LIGHT_GREEN, VGA_BLACK);
+    vga_writestr("     #####      #####     \n");
+    vga_set_color(VGA_LIGHT_CYAN, VGA_BLACK);
+    vga_writestr("      ##############      \n");
+    vga_set_color(VGA_LIGHT_RED, VGA_BLACK);
+    vga_writestr("        ##########        \n");
+    vga_set_color(VGA_LIGHT_MAGENTA, VGA_BLACK);
+    vga_writestr("           ####           \n");
+    vga_set_color(VGA_WHITE, VGA_BLACK);
+    print_prompt();
 }
 
 static void cmd_clear(void) {
