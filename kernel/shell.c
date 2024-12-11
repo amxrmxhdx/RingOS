@@ -530,6 +530,5 @@ void shell_run(void) {
 void shell_return_from_program(void) {
     keyboard_init();
     shell_init();
-    shell_run();
     vga_writestr("\nProgram exited\n");
 }

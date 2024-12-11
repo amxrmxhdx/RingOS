@@ -29,7 +29,7 @@ DISK_SIZE_MB = 128
 # Main target
 all: os.bin objdump.txt $(DISK_IMAGE)
 
-# Generate objdump.txt 
+# Generate objdump.txt
 objdump.txt: os.bin
 	$(OBJDUMP) -DxS $< >$@
 
