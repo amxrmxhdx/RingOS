@@ -5,26 +5,25 @@
 #include "../include/vga.h"
 #include "../include/stdint.h"
 
+#define PROGRAM_LOAD_ADDR 0x100000  // Example: 1MB mark
+#define STACK_SIZE 0x10000          // 64KB stack
+
 bool load_program(const char* filename, program_info_t* info) {
     if (!info) return false;
-    
-    // Initialize program info - keep program and stack well separated
-    info->loaded = false;
-    info->entry_point = PROGRAM_LOAD_ADDR + 0x1000;  // Add 4KB offset for safety
-    info->stack_pointer = PROGRAM_LOAD_ADDR + STACK_SIZE - 0x1000;  // Leave 4KB safety margin
 
-    vga_writestr("Loading program...\n");
+    info->entry_point = (PROGRAM_LOAD_ADDR + 0xFFF) & ~0xFFF;
+    info->stack_pointer = ((PROGRAM_LOAD_ADDR + STACK_SIZE) & ~0xFFF) - 16; // 16-byte aligned
 
-    // Use a much smaller buffer initially for testing
-    uint32_t buffer_size = 4096;  // Start with just 4KB
-    
-    // Clear only the program area
-    memset((void*)info->entry_point, 0, buffer_size);
+    memset((void*)PROGRAM_LOAD_ADDR, 0, STACK_SIZE);
 
-    // Read file with limited size
-    uint32_t size = buffer_size;
+    uint32_t size = STACK_SIZE - 0x2000;
     if (!fat32_read_file(filename, (void*)info->entry_point, &size)) {
         vga_writestr("Error: Could not read program file\n");
+        return false;
+    }
+
+    if (size < 16) {
+        vga_writestr("Error: Program file too small\n");
         return false;
     }
 
@@ -33,26 +32,13 @@ bool load_program(const char* filename, program_info_t* info) {
 }
 
 void jump_to_program(uint32_t entry_point, uint32_t stack_pointer) {
-    typedef void (*program_entry)(void);
-    program_entry program = (program_entry)entry_point;
-
-    vga_writestr("Jumping to program at 0x");
-    for (int i = 7; i >= 0; i--) {
-        char hex = "0123456789ABCDEF"[(entry_point >> (i * 4)) & 0xF];
-        char str[2] = {hex, 0};
-        vga_writestr(str);
-    }
-    vga_writestr("\n");
-
-    // Just switch stack and jump
     asm volatile(
-        "mov %0, %%esp\n"
-        "call *%1\n"
+        "mov %0, %%esp\n"  // Set up new stack
+        "push $0\n"        // Dummy return address
+        "mov $0, %%ebp\n"  // Clear base pointer
+        "jmp *%1\n"        // Jump to program
         :
         : "r"(stack_pointer), "r"(entry_point)
         : "memory"
     );
-
-    // We shouldn't get here normally - program should exit via interrupt
-    vga_writestr("Program returned via interrupt\n");
 }
