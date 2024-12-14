@@ -21,26 +21,68 @@ static bool file_found = false;
 static void uint32_to_str(uint32_t num, char* str) {
     char rev[11];
     int i = 0;
-    
+
     // Handle 0 case
     if (num == 0) {
         str[0] = '0';
         str[1] = '\0';
         return;
     }
-    
+
     // Convert to string in reverse
     while (num != 0) {
         rev[i++] = '0' + (num % 10);
         num = num / 10;
     }
-    
+
     // Reverse the string
     int j;
     for (j = 0; j < i; j++) {
         str[j] = rev[i - 1 - j];
     }
     str[j] = '\0';
+}
+
+bool fat32_convert_to_fat_name(const char* name, char* fat_name) {
+    if (!name || !fat_name) return false;
+
+    // Split the name into base and extension
+    const char* dot = NULL;
+    for (int i = 0; name[i] != '\0'; i++) {
+        if (name[i] == '.') {
+            dot = &name[i];
+            break;
+        }
+    }
+
+    // Handle base name
+    int base_len = dot ? (dot - name) : strlen(name);
+    if (base_len > 8) base_len = 8; // Truncate to 8 characters
+    for (int i = 0; i < base_len; i++) {
+        fat_name[i] = toupper(name[i]);
+    }
+    for (int i = base_len; i < 8; i++) {
+        fat_name[i] = ' '; // Pad with spaces
+    }
+
+    // Handle extension
+    if (dot) {
+        const char* ext = dot + 1;
+        int ext_len = strlen(ext);
+        if (ext_len > 3) ext_len = 3; // Truncate to 3 characters
+        for (int i = 0; i < ext_len; i++) {
+            fat_name[8 + i] = toupper(ext[i]);
+        }
+        for (int i = ext_len; i < 3; i++) {
+            fat_name[8 + i] = ' '; // Pad with spaces
+        }
+    } else {
+        for (int i = 8; i < 11; i++) {
+            fat_name[i] = ' '; // No extension
+        }
+    }
+
+    return true;
 }
 
 static bool compare_filename(const char* fat_name, const char* entry_name) {
@@ -55,7 +97,7 @@ static bool compare_filename(const char* fat_name, const char* entry_name) {
             }
         }
         vga_writestr("]\n");
-        
+
         vga_writestr("ENTRY:  [");
         for(int i = 0; i < 11; i++) {
             if(entry_name[i] == ' ') vga_writestr("_");
@@ -70,7 +112,7 @@ static bool compare_filename(const char* fat_name, const char* entry_name) {
     // Convert test.bin to TEST    BIN format for comparison
     char normalized[11];
     int src = 0, dst = 0;
-    
+
     // Copy name part (up to dot or 8 chars)
     while (dst < 8 && entry_name[src] && entry_name[src] != '.') {
         char c = entry_name[src++];
@@ -79,17 +121,17 @@ static bool compare_filename(const char* fat_name, const char* entry_name) {
         }
         normalized[dst++] = c;
     }
-    
+
     // Pad name with spaces
     while (dst < 8) {
         normalized[dst++] = ' ';
     }
-    
+
     // Skip dot if present
     if (entry_name[src] == '.') {
         src++;
     }
-    
+
     // Copy extension
     while (dst < 11 && entry_name[src]) {
         char c = entry_name[src++];
@@ -98,7 +140,7 @@ static bool compare_filename(const char* fat_name, const char* entry_name) {
         }
         normalized[dst++] = c;
     }
-    
+
     // Pad extension with spaces
     while (dst < 11) {
         normalized[dst++] = ' ';
@@ -143,13 +185,13 @@ static bool compare_names(const char* fat_name, const char* dir_name) {
             while (i < 11 && fat_name[i] == ' ') i++;
             return (i == 11);
         }
-        
+
         // If characters don't match (ignoring case), names don't match
         char c1 = fat_name[i];
         char c2 = dir_name[i];
         if (c1 >= 'a' && c1 <= 'z') c1 = c1 - 'a' + 'A';
         if (c2 >= 'a' && c2 <= 'z') c2 = c2 - 'a' + 'A';
-        
+
         if (c1 != c2) return false;
     }
     return true;
@@ -166,7 +208,7 @@ static void update_path(void) {
         if (strcmp(current_directory.path, "/") != 0) {
             strcat(current_directory.path, "/");
         }
-        
+
         // Add current directory name, trimming any spaces
         char trimmed_name[12];
         int j;
@@ -183,7 +225,7 @@ static void update_path(void) {
         if (strcmp(current_directory.path, "/") != 0) {
             strcat(current_directory.path, "/");
         }
-        
+
         // Add current directory name, trimming any spaces
         char trimmed_name[12];
         int j;
@@ -275,13 +317,13 @@ bool fat32_change_directory(const char* dirname) {
     // Convert input name to FAT32 8.3 format for comparison
     char fat_name[11];
     memset(fat_name, ' ', 11);
-    
+
     // Find dot in name (if any)
     const char* dot = dirname;
     size_t name_len = 0;
     while (*dot && *dot != '.' && name_len < 8) {
         // Convert to uppercase while copying
-        fat_name[name_len] = (*dot >= 'a' && *dot <= 'z') ? 
+        fat_name[name_len] = (*dot >= 'a' && *dot <= 'z') ?
                             (*dot - 'a' + 'A') : *dot;
         dot++;
         name_len++;
@@ -293,7 +335,7 @@ bool fat32_change_directory(const char* dirname) {
         size_t ext_pos = 8;
         while (*dot && ext_pos < 11) {
             // Convert extension to uppercase
-            fat_name[ext_pos] = (*dot >= 'a' && *dot <= 'z') ? 
+            fat_name[ext_pos] = (*dot >= 'a' && *dot <= 'z') ?
                                (*dot - 'a' + 'A') : *dot;
             dot++;
             ext_pos++;
@@ -307,7 +349,7 @@ bool fat32_change_directory(const char* dirname) {
 
     while (current_cluster < 0x0FFFFFF8) {
         uint32_t current_sector = cluster_to_lba(current_cluster);
-        
+
         for (uint32_t i = 0; i < sectors_per_cluster; i++) {
             if (!ata_read_sectors(current_sector + i, 1, buffer)) {
                 return false;
@@ -368,7 +410,7 @@ bool fat32_list_directory(void (*callback)(const char* name, uint32_t size, uint
 
     while (current_cluster < 0x0FFFFFF8) {
         uint32_t current_sector = cluster_to_lba(current_cluster);
-        
+
         for (uint32_t i = 0; i < sectors_per_cluster; i++) {
             if (!ata_read_sectors(current_sector + i, 1, buffer)) {
                 return false;
@@ -382,7 +424,7 @@ bool fat32_list_directory(void (*callback)(const char* name, uint32_t size, uint
                 }
 
                 // Skip deleted entries, volume labels, and special entries (. and ..)
-                if (entry[j].name[0] == 0xE5 || 
+                if (entry[j].name[0] == 0xE5 ||
                     entry[j].attributes == 0x08 ||
                     entry[j].name[0] == '.') {
                     continue;
@@ -508,6 +550,32 @@ bool fat32_create_directory(const char* name) {
     return false;
 }
 
+bool fat32_free_clusters(uint32_t first_cluster) {
+    if (first_cluster < 2 || first_cluster >= 0x0FFFFFF8) {
+        return false; // Invalid cluster
+    }
+
+    uint32_t current_cluster = first_cluster;
+    uint32_t next_cluster;
+
+    while (current_cluster < 0x0FFFFFF8) {
+        // Get the next cluster in the chain
+        next_cluster = fat32_get_next_cluster(current_cluster);
+        if (next_cluster == 0x0FFFFFF7) {
+            return false; // Read error
+        }
+
+        // Mark the current cluster as free
+        if (!fat32_write_fat_entry(current_cluster, 0)) {
+            return false; // Write error
+        }
+
+        current_cluster = next_cluster;
+    }
+
+    return true;
+}
+
 uint32_t fat32_allocate_cluster(void) {
     uint32_t buffer[128];  // 512 bytes / 4 bytes per entry
 
@@ -558,7 +626,7 @@ bool fat32_write_fat_entry(uint32_t cluster, uint32_t value) {
 bool fat32_write_file(const char* name, const void* data, uint32_t size) {
     if (!is_initialized || !data) return false;
 
-    // First, create the file entry
+    // First, locate or create the file entry
     uint32_t current_cluster = current_directory.cluster;
     uint8_t dir_buffer[512];
     fat32_dir_entry_t* entry = NULL;
@@ -566,7 +634,13 @@ bool fat32_write_file(const char* name, const void* data, uint32_t size) {
     uint32_t entry_offset = 0;
     bool found_slot = false;
 
-    // Find a free directory entry
+    // Convert the file name to FAT-compliant 8.3 format
+    char fat_name[11] = {0};
+    if (!fat32_convert_to_fat_name(name, fat_name)) {
+        return false; // Conversion failed (invalid name)
+    }
+
+    // Search for the file in the directory or find a free entry
     while (current_cluster < 0x0FFFFFF8 && !found_slot) {
         uint32_t current_sector = cluster_to_lba(current_cluster);
 
@@ -577,6 +651,21 @@ bool fat32_write_file(const char* name, const void* data, uint32_t size) {
 
             entry = (fat32_dir_entry_t*)dir_buffer;
             for (uint32_t j = 0; j < 16; j++) {
+                // Check if file already exists
+                if (memcmp(entry[j].name, fat_name, 11) == 0) {
+                    entry = &entry[j];
+                    entry_sector = current_sector + i;
+                    entry_offset = j;
+                    found_slot = true;
+
+                    // Free existing cluster chain before overwriting
+                    uint32_t first_cluster = ((uint32_t)entry->first_cluster_high << 16) | entry->first_cluster_low;
+                    if (!fat32_free_clusters(first_cluster)) return false;
+
+                    break;
+                }
+
+                // Check for a free slot
                 if (entry[j].name[0] == 0x00 || entry[j].name[0] == 0xE5) {
                     entry = &entry[j];
                     entry_sector = current_sector + i;
@@ -586,6 +675,7 @@ bool fat32_write_file(const char* name, const void* data, uint32_t size) {
                 }
             }
         }
+
         if (!found_slot) {
             current_cluster = fat32_get_next_cluster(current_cluster);
         }
@@ -593,24 +683,24 @@ bool fat32_write_file(const char* name, const void* data, uint32_t size) {
 
     if (!found_slot) return false;
 
-    // Allocate first cluster for file data
+    // Allocate the first cluster for the file
     uint32_t first_cluster = fat32_allocate_cluster();
     if (!first_cluster) return false;
 
-    // Create file entry
+    // Create or update the directory entry
     memset(entry, 0, sizeof(fat32_dir_entry_t));
-    memcpy(entry->name, name, 11);
-    entry->attributes = 0x20;  // Archive bit
+    memcpy(entry->name, fat_name, 11); // Use the FAT32-compliant name
+    entry->attributes = 0x20; // Archive attribute
     entry->first_cluster_high = (uint16_t)(first_cluster >> 16);
     entry->first_cluster_low = (uint16_t)(first_cluster & 0xFFFF);
     entry->file_size = size;
 
-    // Write directory entry
+    // Write the updated directory entry to disk
     if (!ata_write_sectors(entry_sector, 1, dir_buffer)) {
         return false;
     }
 
-    // Write file data
+    // Write file data to clusters
     uint32_t bytes_written = 0;
     uint32_t current_data_cluster = first_cluster;
 
@@ -623,14 +713,14 @@ bool fat32_write_file(const char* name, const void* data, uint32_t size) {
             sectors_to_write = sectors_per_cluster;
         }
 
-        // Write data
+        // Write the data to the current cluster
         if (!ata_write_sectors(data_sector, sectors_to_write, (uint8_t*)data + bytes_written)) {
             return false;
         }
 
         bytes_written += sectors_to_write * 512;
 
-        // Allocate next cluster if needed
+        // Allocate the next cluster if more data needs to be written
         if (bytes_written < size) {
             uint32_t next_cluster = fat32_allocate_cluster();
             if (!next_cluster) return false;
@@ -638,8 +728,14 @@ bool fat32_write_file(const char* name, const void* data, uint32_t size) {
             if (!fat32_write_fat_entry(current_data_cluster, next_cluster)) {
                 return false;
             }
+
             current_data_cluster = next_cluster;
         }
+    }
+
+    // Mark the end of the FAT chain
+    if (!fat32_write_fat_entry(current_data_cluster, 0x0FFFFFFF)) {
+        return false;
     }
 
     return true;
@@ -659,7 +755,7 @@ bool fat32_read_file(const char* name, void* buffer, uint32_t* size) {
     // Find the file entry
     while (current_cluster < 0x0FFFFFF8 && !found) {
         uint32_t current_sector = cluster_to_lba(current_cluster);
-        
+
         for (uint32_t i = 0; i < sectors_per_cluster && !found; i++) {
             if (!ata_read_sectors(current_sector + i, 1, dir_buffer)) {
                 if (debug) vga_writestr("[FAT32] Failed to read directory sector\n");

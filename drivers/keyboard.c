@@ -102,10 +102,10 @@ char keyboard_read(void) {
             // Handle extended keys (e.g., arrow keys)
             extended_code = 0; // Reset the extended code flag
             switch (scancode) {
-                case KEY_UP:    return '\1'; // Up Arrow
-                case KEY_DOWN:  return '\2'; // Down Arrow
-                case KEY_LEFT:  return '\3'; // Left Arrow
-                case KEY_RIGHT: return '\4'; // Right Arrow
+                case KEY_UP:    return '^'; // Up Arrow
+                case KEY_DOWN:  return 'v'; // Down Arrow
+                case KEY_LEFT:  return '<'; // Left Arrow
+                case KEY_RIGHT: return '>'; // Right Arrow
                 default:        return 0;
             }
         }

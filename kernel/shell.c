@@ -528,6 +528,12 @@ void shell_process_command(void) {
     }
     else if (strcmp(command, "ed") == 0) {
         cmd_ed(arg);
+        vga_clear();
+        print_prompt();
+    }
+    else if (strcmp(command, "writetest") == 0) {
+        fat32_write_file("test.txt", "Hello Test", 10);
+        print_prompt();
     }
     else if (cmd_index > 0) {
         vga_writestr("\nUnknown command: ");
@@ -577,6 +583,7 @@ void shell_run(void) {
 }
 
 void shell_return_from_program(void) {
+    vga_clear();
     shell_init();
     vga_writestr("\nProgram exited\n");
 }

@@ -52,6 +52,13 @@ char* strcat(char* dest, const char* src) {
     return dest;
 }
 
+char toupper(char c) {
+    if (c >= 'a' && c <= 'z') {
+        return c - ('a' - 'A');
+    }
+    return c;
+}
+
 char* strncat(char* dest, const char* src, size_t n) {
     char* d = dest + strlen(dest);
     while (n-- && (*src)) {
@@ -59,4 +66,20 @@ char* strncat(char* dest, const char* src, size_t n) {
     }
     *d = '\0';
     return dest;
+}
+
+void itoa(int num, char *str, int width) {
+    int i = width - 1;
+    str[width] = '\0'; // Null-terminate the string
+
+    // Fill the string in reverse with digits
+    while (i >= 0) {
+        if (num > 0) {
+            str[i] = '0' + (num % 10); // Get the last digit
+            num /= 10;                // Remove the last digit
+        } else {
+            str[i] = ' '; // Add padding spaces
+        }
+        i--;
+    }
 }

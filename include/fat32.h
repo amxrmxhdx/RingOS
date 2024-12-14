@@ -82,6 +82,7 @@ bool fat32_create_directory(const char* name);
 bool fat32_init_directory_structure(void);
 bool fat32_write_file(const char* name, const void* data, uint32_t size);
 bool fat32_read_file(const char* name, void* buffer, uint32_t* size);
+bool fat32_free_clusters(uint32_t first_cluster);
 uint32_t fat32_allocate_cluster(void);
 bool fat32_write_fat_entry(uint32_t cluster, uint32_t value);
 bool fat32_change_directory(const char* dirname);
