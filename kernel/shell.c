@@ -4,6 +4,7 @@
 #include <fat32.h>
 #include <loader.h>
 #include "libc/stdio.h"
+#include "programs/editor.h"
 
 #define MAX_CMD_LENGTH 256
 
@@ -57,6 +58,52 @@ static void cmd_ls(void) {
     if (!fat32_list_directory(ls_callback)) {
         vga_writestr("Error reading directory. Please try again.\n");
     }
+    print_prompt();
+}
+
+static void cmd_ed(const char *filename) {
+    if (!filename || strlen(filename) == 0) {
+        vga_writestr("\nUsage: ed <filename>\n");
+        return;
+    }
+
+    // Create a FAT formatted name
+    char fat_name[11];
+    memset(fat_name, ' ', 11);
+
+    // Copy name part (up to 8 chars)
+    const char* dot = filename;
+    size_t name_len = 0;
+    while (*dot && *dot != '.' && name_len < 8) {
+        fat_name[name_len] = (*dot >= 'a' && *dot <= 'z') ?
+                            (*dot - 'a' + 'A') : *dot;
+        dot++;
+        name_len++;
+    }
+
+    // Copy extension if exists
+    if (*dot == '.' && dot[1]) {
+        dot++; // Skip the dot
+        size_t ext_pos = 8;
+        while (*dot && ext_pos < 11) {
+            fat_name[ext_pos] = (*dot >= 'a' && *dot <= 'z') ?
+                               (*dot - 'a' + 'A') : *dot;
+            dot++;
+            ext_pos++;
+        }
+    }
+
+    vga_writestr("Looking for file: '");
+    for (int i = 0; i < 11; i++) {
+        char c[2] = {fat_name[i], '\0'};
+        vga_writestr(c);
+    }
+    vga_writestr("'\n");
+
+    static char buffer[4096];
+    uint32_t size = sizeof(buffer) - 1;
+
+    editor_run(fat_name);
     print_prompt();
 }
 
@@ -478,6 +525,9 @@ void shell_process_command(void) {
         prints("Hello from syscall\n");
         // syscall_exit(0);
         print_prompt();
+    }
+    else if (strcmp(command, "ed") == 0) {
+        cmd_ed(arg);
     }
     else if (cmd_index > 0) {
         vga_writestr("\nUnknown command: ");
