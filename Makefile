@@ -26,6 +26,12 @@ FILESYSTEM_DIR = filesystem
 DISK_IMAGE = disk.img
 DISK_SIZE_MB = 128
 
+QEMU ?= qemu-system-i386
+QEMU_FLAGS ?= -no-reboot -monitor stdio
+QEMU_VGA ?= std
+USERPROG_SRC ?= programs/hello.c
+USERPROG_OUT ?= filesystem/userland/apps/HELLO.BIN
+
 # Main target
 all: os.bin objdump.txt $(DISK_IMAGE)
 
@@ -60,5 +66,14 @@ clean:
 
 # Run in QEMU
 run: os.bin $(DISK_IMAGE)
-	qemu-system-i386 -kernel os.bin -drive file=$(DISK_IMAGE),format=raw,if=ide -vga vmware \
-		-d int -no-reboot -no-shutdown -monitor stdio
+	$(QEMU) -kernel os.bin -drive file=$(DISK_IMAGE),format=raw,if=ide -vga $(QEMU_VGA) \
+		-device isa-debug-exit,iobase=0x501,iosize=0x02 \
+		$(QEMU_FLAGS)
+
+# Build one custom user program into the filesystem tree.
+userprog:
+	./tools/build-userprog.sh $(USERPROG_SRC) $(USERPROG_OUT)
+
+# Build default sample app.
+userprog-hello:
+	./tools/build-userprog.sh programs/hello.c filesystem/userland/apps/HELLO.BIN

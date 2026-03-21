@@ -203,19 +203,18 @@ static void update_path(void) {
     current_directory.path[1] = '\0';
 
     // Build path from parent directories
-    for (int i = 0; i < directory_depth; i++) {
-        // Don't add another slash if we're already at root
-        if (strcmp(current_directory.path, "/") != 0) {
-            strcat(current_directory.path, "/");
-        }
-
-        // Add current directory name, trimming any spaces
+    // Start from i=1 to skip the root entry (already represented by the leading '/')
+    for (int i = 1; i < directory_depth; i++) {
+        // Add current directory name, trimming spaces and stopping at null
         char trimmed_name[12];
         int j;
-        for (j = 0; j < 11 && parent_directories[i].name[j] != ' '; j++) {
+        for (j = 0; j < 11 && parent_directories[i].name[j] != ' ' && parent_directories[i].name[j] != '\0'; j++) {
             trimmed_name[j] = parent_directories[i].name[j];
         }
         trimmed_name[j] = '\0';
+        if (strcmp(current_directory.path, "/") != 0) {
+            strcat(current_directory.path, "/");
+        }
         strcat(current_directory.path, trimmed_name);
     }
 
@@ -515,6 +514,50 @@ bool fat32_delete_file(const char* name) {
     return false;
 }
 
+bool fat32_rename_file(const char* old_name, const char* new_name) {
+    if (!is_initialized || !old_name || !new_name) return false;
+
+    uint32_t current_cluster = current_directory.cluster;
+    uint8_t buffer[512];
+    fat32_dir_entry_t* entry;
+
+    while (current_cluster < 0x0FFFFFF8) {
+        uint32_t current_sector = cluster_to_lba(current_cluster);
+
+        for (uint32_t i = 0; i < sectors_per_cluster; i++) {
+            if (!ata_read_sectors(current_sector + i, 1, buffer)) {
+                return false;
+            }
+
+            entry = (fat32_dir_entry_t*)buffer;
+            for (uint32_t j = 0; j < 16; j++) {
+                if (entry[j].name[0] == 0x00) {
+                    return false;
+                }
+                if (entry[j].name[0] == 0xE5) {
+                    continue;
+                }
+                if ((entry[j].attributes & ATTR_LONG_NAME) == ATTR_LONG_NAME) {
+                    continue;
+                }
+
+                if (memcmp(entry[j].name, old_name, 11) == 0) {
+                    memcpy(entry[j].name, new_name, 11);
+                    if (!ata_write_sectors(current_sector + i, 1, buffer)) {
+                        return false;
+                    }
+                    return true;
+                }
+            }
+        }
+
+        current_cluster = fat32_get_next_cluster(current_cluster);
+        if (current_cluster == 0) return false;
+    }
+
+    return false;
+}
+
 bool fat32_create_directory(const char* name) {
     if (!is_initialized) return false;
 
@@ -624,7 +667,9 @@ bool fat32_write_fat_entry(uint32_t cluster, uint32_t value) {
 }
 
 bool fat32_write_file(const char* name, const void* data, uint32_t size) {
-    if (!is_initialized || !data) return false;
+    // Special case: empty files with NULL data pointer
+    if (!is_initialized) return false;
+    if (!data && size > 0) return false;
 
     // First, locate or create the file entry
     uint32_t current_cluster = current_directory.cluster;
@@ -660,7 +705,9 @@ bool fat32_write_file(const char* name, const void* data, uint32_t size) {
 
                     // Free existing cluster chain before overwriting
                     uint32_t first_cluster = ((uint32_t)entry->first_cluster_high << 16) | entry->first_cluster_low;
-                    if (!fat32_free_clusters(first_cluster)) return false;
+                    if (first_cluster >= 2 && first_cluster < 0x0FFFFFF8) {
+                        if (!fat32_free_clusters(first_cluster)) return false;
+                    }
 
                     break;
                 }
@@ -683,17 +730,28 @@ bool fat32_write_file(const char* name, const void* data, uint32_t size) {
 
     if (!found_slot) return false;
 
-    // Allocate the first cluster for the file
-    uint32_t first_cluster = fat32_allocate_cluster();
-    if (!first_cluster) return false;
-
     // Create or update the directory entry
     memset(entry, 0, sizeof(fat32_dir_entry_t));
     memcpy(entry->name, fat_name, 11); // Use the FAT32-compliant name
     entry->attributes = 0x20; // Archive attribute
+    entry->file_size = size;
+
+    // Special case: empty files don't need cluster allocation
+    if (size == 0) {
+        entry->first_cluster_high = 0;
+        entry->first_cluster_low = 0;
+        if (!ata_write_sectors(entry_sector, 1, dir_buffer)) {
+            return false;
+        }
+        return true;
+    }
+
+    // Allocate the first cluster for the file (only if size > 0)
+    uint32_t first_cluster = fat32_allocate_cluster();
+    if (!first_cluster) return false;
+
     entry->first_cluster_high = (uint16_t)(first_cluster >> 16);
     entry->first_cluster_low = (uint16_t)(first_cluster & 0xFFFF);
-    entry->file_size = size;
 
     // Write the updated directory entry to disk
     if (!ata_write_sectors(entry_sector, 1, dir_buffer)) {
@@ -706,19 +764,31 @@ bool fat32_write_file(const char* name, const void* data, uint32_t size) {
 
     while (bytes_written < size) {
         uint32_t data_sector = cluster_to_lba(current_data_cluster);
-        uint32_t bytes_to_write = size - bytes_written;
-        uint32_t sectors_to_write = (bytes_to_write + 511) / 512;
+        uint32_t cluster_bytes_left = sectors_per_cluster * 512;
 
-        if (sectors_to_write > sectors_per_cluster) {
-            sectors_to_write = sectors_per_cluster;
+        /*
+         * Write one sector at a time using a zero-padded staging buffer.
+         * This avoids reading past the caller's source buffer when file size
+         * is not aligned to 512 bytes.
+         */
+        for (uint32_t s = 0; s < sectors_per_cluster && bytes_written < size; s++) {
+            uint8_t secbuf[512];
+            uint32_t remain = size - bytes_written;
+            uint32_t chunk = remain > 512 ? 512 : remain;
+
+            memset(secbuf, 0, sizeof(secbuf));
+            memcpy(secbuf, (const uint8_t*)data + bytes_written, chunk);
+
+            if (!ata_write_sectors(data_sector + s, 1, secbuf)) {
+                return false;
+            }
+
+            bytes_written += chunk;
+            if (cluster_bytes_left >= chunk) cluster_bytes_left -= chunk;
+            else cluster_bytes_left = 0;
         }
 
-        // Write the data to the current cluster
-        if (!ata_write_sectors(data_sector, sectors_to_write, (uint8_t*)data + bytes_written)) {
-            return false;
-        }
-
-        bytes_written += sectors_to_write * 512;
+        (void)cluster_bytes_left;
 
         // Allocate the next cluster if more data needs to be written
         if (bytes_written < size) {

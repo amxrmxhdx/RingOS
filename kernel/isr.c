@@ -17,6 +17,7 @@ void isr_handler(struct registers_t *regs) {
             case 0: // Exit syscall
                 print("Program exited\n");
                 shell_return_from_program();
+                break;
             case 1:
                 printChar((char) arg1);
                 break;

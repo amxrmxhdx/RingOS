@@ -6,5 +6,6 @@ void shell_return_from_program(void);
 void shell_run(void);
 void shell_process_command(void);
 void shell_handle_keypress(char c);
+void shell_execute_line(const char* line);
 
 #endif /* RINGOS_SHELL_H */

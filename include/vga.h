@@ -35,4 +35,14 @@ void vga_writestr(const char* str);
 void vga_writehex(uint32_t n);
 void vga_set_cursor_pos(uint16_t pos);
 
+typedef void (*vga_putchar_redirect_fn)(char c, void* user_data);
+typedef void (*vga_clear_redirect_fn)(void* user_data);
+typedef void (*vga_color_redirect_fn)(uint8_t fg, uint8_t bg, void* user_data);
+
+void vga_set_redirect(vga_putchar_redirect_fn putchar_fn,
+                      vga_clear_redirect_fn clear_fn,
+                      vga_color_redirect_fn color_fn,
+                      void* user_data);
+void vga_clear_redirect(void);
+
 #endif /* RINGOS_VGA_H */

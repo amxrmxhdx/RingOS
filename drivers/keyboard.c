@@ -116,6 +116,41 @@ char keyboard_read(void) {
     } while (1); // Keep reading until a valid key is processed
 }
 
+char keyboard_poll_char(void) {
+    static uint8_t extended_code = 0;
+    uint8_t status;
+
+    status = inb(KEYBOARD_STATUS_PORT);
+    if ((status & KEYBOARD_OUTPUT_FULL) == 0) {
+        return 0;
+    }
+
+    /* Leave auxiliary-device bytes for mouse packet handling. */
+    if (status & 0x20) {
+        return 0;
+    }
+
+    uint8_t scancode = inb(KEYBOARD_DATA_PORT);
+
+    if (scancode == SCANCODE_EXTENDED) {
+        extended_code = 1;
+        return 0;
+    }
+
+    if (extended_code) {
+        extended_code = 0;
+        switch (scancode) {
+            case KEY_UP:    return '^';
+            case KEY_DOWN:  return 'v';
+            case KEY_LEFT:  return '<';
+            case KEY_RIGHT: return '>';
+            default:        return 0;
+        }
+    }
+
+    return handle_scancode(scancode);
+}
+
 bool keyboard_is_shift_pressed(void) {
     return shift_pressed;
 }

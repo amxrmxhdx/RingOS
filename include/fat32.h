@@ -77,6 +77,7 @@ bool fat32_find_file(const char* name, fat32_dir_entry_t* entry);
 uint32_t fat32_get_next_cluster(uint32_t current_cluster);
 bool fat32_create_file(const char* name);
 bool fat32_delete_file(const char* name);
+bool fat32_rename_file(const char* old_name, const char* new_name);
 bool fat32_list_directory(void (*callback)(const char* name, uint32_t size, uint8_t attr));
 bool fat32_create_directory(const char* name);
 bool fat32_init_directory_structure(void);

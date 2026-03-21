@@ -26,6 +26,7 @@
 // Function prototypes
 void keyboard_init(void);
 char keyboard_read(void);
+char keyboard_poll_char(void);
 bool keyboard_is_shift_pressed(void);
 bool keyboard_is_caps_on(void);
 

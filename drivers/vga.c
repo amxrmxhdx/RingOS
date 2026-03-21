@@ -9,6 +9,10 @@
 static uint16_t* const vga_buffer = (uint16_t*)VGA_MEMORY;
 static uint8_t vga_color;
 static uint16_t cursor_pos;
+static vga_putchar_redirect_fn g_redirect_putchar = 0;
+static vga_clear_redirect_fn g_redirect_clear = 0;
+static vga_color_redirect_fn g_redirect_color = 0;
+static void* g_redirect_user_data = 0;
 
 static uint16_t vga_entry(char c, uint8_t color) {
     uint16_t c16 = c;
@@ -36,6 +40,11 @@ void vga_init(void) {
 }
 
 void vga_putchar(char c) {
+    if (g_redirect_putchar) {
+        g_redirect_putchar(c, g_redirect_user_data);
+        return;
+    }
+
     if (c == '\n') {
         cursor_pos = (cursor_pos / VGA_WIDTH + 1) * VGA_WIDTH;
     }
@@ -84,6 +93,11 @@ void vga_writehex(uint32_t n) {
 }
 
 void vga_clear(void) {
+    if (g_redirect_clear) {
+        g_redirect_clear(g_redirect_user_data);
+        return;
+    }
+
     for (int i = 0; i < VGA_WIDTH * VGA_HEIGHT; i++) {
         vga_buffer[i] = vga_entry(' ', vga_color);
     }
@@ -101,4 +115,24 @@ void vga_set_cursor_pos(uint16_t pos) {
 
 void vga_set_color(uint8_t fg, uint8_t bg) {
     vga_color = (bg << 4) | (fg & 0x0F);
+    if (g_redirect_color) {
+        g_redirect_color(fg, bg, g_redirect_user_data);
+    }
+}
+
+void vga_set_redirect(vga_putchar_redirect_fn putchar_fn,
+                      vga_clear_redirect_fn clear_fn,
+                      vga_color_redirect_fn color_fn,
+                      void* user_data) {
+    g_redirect_putchar = putchar_fn;
+    g_redirect_clear = clear_fn;
+    g_redirect_color = color_fn;
+    g_redirect_user_data = user_data;
+}
+
+void vga_clear_redirect(void) {
+    g_redirect_putchar = 0;
+    g_redirect_clear = 0;
+    g_redirect_color = 0;
+    g_redirect_user_data = 0;
 }

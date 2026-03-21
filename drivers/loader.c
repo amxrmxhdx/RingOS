@@ -6,23 +6,25 @@
 #include "../include/keyboard.h"
 #include "../include/shell.h"
 
-#define PROGRAM_LOAD_ADDR 0x100000  // Example: 1MB mark
-#define STACK_SIZE 0x1000          // 64KB stack
-
 bool load_program(const char* filename, program_info_t* info) {
     if (!info) return false;
 
     vga_writestr("Debug 1: Starting load_program\n");
 
-    // Use a temporary buffer first
+    // Stage file contents in a bounded kernel buffer before copying to entry.
     static uint8_t temp_buffer[STACK_SIZE];
-    uint32_t size = STACK_SIZE - 0x2000;
+    uint32_t size = (uint32_t)sizeof(temp_buffer);
 
     vga_writestr("Debug 2: About to read file\n");
 
     // Read into temporary buffer first
     if (!fat32_read_file(filename, temp_buffer, &size)) {
         vga_writestr("Error: Could not read program file\n");
+        return false;
+    }
+
+    if (size == 0 || size > (uint32_t)sizeof(temp_buffer)) {
+        vga_writestr("Error: Invalid program size\n");
         return false;
     }
 
